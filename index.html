@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--
+██████   ██████ ██    ██ ██████  ███████  ██████  ███    ██
+██   ██ ██       ██  ██  ██   ██ ██      ██       ████   ██
+██   ██ ██        ████   ██   ██ ███████ ██   ███ ██ ██  ██
+██   ██ ██         ██    ██   ██      ██ ██    ██ ██  ██ ██
+██████   ██████    ██    ██████  ███████  ██████  ██   ████
+
+  Made by DCY.DSGN
+  Instagram : https://instagram.com/dcy.dsgn/
+  Website   : https://decoy.ltd/
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>FOUR FOUR FOUR</title>
+<meta name="description" content="Forged in angelic chaos.">
+<link rel="icon" type="image/png" href="single-four.png">
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* ── 444 brand palette (Identity Guide v1.1) ── */
+    --midnight:  #1A2332;
+    --void:      #0c1118;
+    --glacier:   #EEF2F5;
+    --silver:    #D4DDE3;
+    --arctic:    #5B7A95;
+    --ice-mist:  #B8C8D4;
+    --chrome:    #3D5060;
+
+    --glacier-dim:  rgba(238, 242, 245, 0.55);
+    --glacier-ghost:rgba(238, 242, 245, 0.30);
+    --hair:        rgba(184, 200, 212, 0.14);
+    --hair-bright: rgba(184, 200, 212, 0.28);
+
+    --display: 'Audiowide', sans-serif;
+    --primary: 'Inter', system-ui, sans-serif;
+    --mono:    'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(120% 90% at 50% -10%, #20304a 0%, var(--midnight) 38%, var(--void) 100%);
+    color: var(--glacier);
+    font-family: var(--mono);
+    overflow: hidden;                 /* single screen — never scrolls */
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-decoration: none; }
+  canvas { display: block; }
+
+  #webgl   { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 0; }
+  #vignette{ position: fixed; inset: 0; z-index: 2; pointer-events: none;
+             background: radial-gradient(110% 80% at 50% 46%, transparent 52%, rgba(6,9,14,0.6) 100%); }
+  #grain   { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0.05; mix-blend-mode: screen;
+             background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.5) 0 1px, transparent 1px 3px); }
+
+  /* ════════ BOOT ════════ */
+  #boot {
+    position: fixed; inset: 0; z-index: 50; background: var(--void);
+    transition: opacity 0.7s ease;
+  }
+  #boot.gone { opacity: 0; pointer-events: none; }
+  /* the intro logo is positioned (in JS) to match the loaded wordmark exactly, so it never jumps */
+  #boot-logo {
+    position: fixed; left: 50%; top: 38%; transform: translateX(-50%); width: 250px; height: 61px; background: var(--glacier);
+    -webkit-mask: var(--wm) center / contain no-repeat; mask: var(--wm) center / contain no-repeat;
+    opacity: 0; filter: drop-shadow(0 0 18px rgba(91,122,149,0.55)); animation: breathe 3.4s ease-in-out infinite;
+  }
+  #boot-console {
+    position: fixed; left: 0; right: 0; top: 56%; z-index: 50;
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+  }
+  @keyframes breathe { 0%,100%{ filter: drop-shadow(0 0 12px rgba(91,122,149,0.35)); } 50%{ filter: drop-shadow(0 0 26px rgba(184,200,212,0.7)); } }
+  /* boot console: lines stream in at the bottom, older ones scroll up and fade out the top */
+  #boot-lines {
+    font-family: var(--mono); font-size: 10.5px; line-height: 1.55; letter-spacing: 0.05em;
+    color: var(--ice-mist); width: min(560px, 88vw); height: 184px; opacity: 0;
+    text-align: left; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    -webkit-mask-image: linear-gradient(transparent 0%, #000 26%, #000 100%);
+            mask-image: linear-gradient(transparent 0%, #000 26%, #000 100%);
+  }
+  /* flex:none keeps each line at its natural height so they never shrink/overlap when flooding */
+  #boot-lines .ln { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #boot-lines .head { color: var(--ice-mist); }
+  #boot-lines .sys  { color: var(--arctic); }
+  #boot-lines .ok   { color: var(--silver); }
+  #boot-lines .secured { color: var(--glacier); letter-spacing: 0.12em; }
+  @media (max-height: 600px) { #boot-lines { height: 132px; } }
+  #boot-bar-wrap { width: min(560px, 88vw); height: 2px; background: var(--hair); opacity: 0; overflow: hidden; }
+  #boot-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--arctic), var(--ice-mist)); box-shadow: 0 0 12px rgba(184,200,212,0.8); transition: width 0.25s ease; }
+
+  /* ════════ STAGE — single centered hub ════════ */
+  /* stage stays composited; the boot overlay fades out OVER it so backdrop-filter never pops */
+  #stage { position: fixed; inset: 0; z-index: 10; }
+
+  /* fixed top rail + bottom footer */
+  .rail, .foot {
+    position: fixed; left: 0; right: 0; z-index: 12;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 22px; pointer-events: none;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.26em;
+    color: var(--glacier-ghost); text-transform: uppercase;
+  }
+  .rail { top: 0; padding-top: max(16px, env(safe-area-inset-top)); }
+  .foot { bottom: 0; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .rail .mono-mark { width: 46px; height: 21px; background: var(--glacier);
+    -webkit-mask: url(symbol.png) left center / contain no-repeat; mask: url(symbol.png) left center / contain no-repeat; opacity: 0.85; }
+  .dot { color: var(--arctic); }
+
+  /* the hub: vertically + horizontally centered, fits the viewport */
+  .hub {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 22px; padding: 72px 22px; text-align: center;
+  }
+  .mod-header {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    padding: 26px 18px 22px; border-bottom: 1px solid var(--hair);
+  }
+  .mod-kicker { font-family: var(--mono); font-size: 9px; letter-spacing: 0.32em; color: var(--ice-mist);
+                text-transform: uppercase; opacity: 0.9; }
+  .hub-wm { width: min(250px, 62vw); filter: drop-shadow(0 0 26px rgba(91,122,149,0.4)); }
+  .hub-type { height: 15px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--ice-mist); }
+  .hub-type .cur { color: var(--arctic); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .reveal { transform: none; }
+
+  /* ── the links module ── */
+  .module {
+    width: min(420px, 90vw);
+    border: 1px solid var(--hair);
+    background: linear-gradient(180deg, rgba(26,35,50,0.6), rgba(12,17,24,0.62));
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    transform: translateY(16px);
+    transition: transform 0.75s cubic-bezier(.2,.7,.2,1);
+    will-change: transform;
+  }
+  .mod-label {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 14px; border-bottom: 1px solid var(--hair);
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.26em; color: var(--ice-mist); text-transform: uppercase;
+  }
+  .mod-label .blip { width: 5px; height: 5px; border-radius: 50%; background: var(--chrome); display: inline-block; margin-left: 7px; vertical-align: middle; }
+  .player.playing ~ * .blip, .player.playing .blip { background: var(--ice-mist); box-shadow: 0 0 9px var(--ice-mist); animation: pulse 1.3s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+
+  /* compact player */
+  .player { display: flex; align-items: center; gap: 12px; padding: 14px; }
+  .p-btn {
+    flex: none; width: 38px; height: 38px; border: 1px solid var(--hair-bright);
+    background: rgba(91,122,149,0.14); color: var(--glacier);
+    display: grid; place-items: center; cursor: pointer; transition: background .18s, border-color .18s, transform .1s;
+  }
+  .p-btn:hover { background: rgba(184,200,212,0.16); border-color: var(--ice-mist); }
+  .p-btn:active { transform: scale(0.93); }
+  .p-btn svg { width: 15px; height: 15px; fill: currentColor; }
+  .p-next { width: 32px; height: 32px; }
+  .p-mid { flex: 1; min-width: 0; text-align: left; display: flex; flex-direction: column; gap: 6px; }
+  .p-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .p-title { font-family: var(--primary); font-weight: 700; font-size: 13px; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-time { font-family: var(--mono); font-size: 9px; color: var(--glacier-dim); letter-spacing: 0.06em; flex: none; }
+  .p-viz { width: 100%; height: 22px; display: block; }
+
+  /* track pills */
+  .tracks { display: flex; gap: 6px; padding: 0 14px 14px; }
+  .pill {
+    flex: 1; padding: 8px 6px; cursor: pointer; text-align: center;
+    border: 1px solid var(--hair); background: rgba(184,200,212,0.03);
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; color: var(--glacier-dim);
+    text-transform: uppercase; transition: background .18s, border-color .18s, color .18s;
+  }
+  .pill:hover { background: rgba(91,122,149,0.12); color: var(--glacier); }
+  .pill.active { border-color: var(--ice-mist); color: var(--ice-mist); background: rgba(91,122,149,0.16); }
+
+  /* social links grid */
+  .links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hair); border-top: 1px solid var(--hair); }
+  .link {
+    background: rgba(12,17,24,0.55); padding: 18px 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 9px;
+    transition: background .2s; position: relative;
+  }
+  .link:hover { background: rgba(91,122,149,0.16); }
+  .link .l-ico { display: block; height: 20px; }
+  .link .l-ico svg { width: 20px; height: 20px; display: block; fill: var(--silver); opacity: 0.85; transition: fill .2s, opacity .2s; }
+  .link:hover .l-ico svg { fill: #fff; opacity: 1; }
+  .link .l-v { font-family: var(--primary); font-weight: 600; font-size: 12px; color: var(--glacier-dim); transition: color .2s; }
+  .link:hover .l-v { color: var(--glacier); }
+
+  /* ── mobile: keep the whole hub inside one screen ── */
+  @media (max-width: 520px) {
+    .rail, .foot { font-size: 8px; letter-spacing: 0.14em; padding-left: 16px; padding-right: 16px; }
+    .hub { padding: 56px 14px; gap: 0; }
+    .module { width: 100%; max-width: 380px; }
+    .mod-header { padding: 18px 14px 15px; gap: 9px; }
+    .hub-wm { width: min(210px, 56vw); }
+    .player { padding: 12px; gap: 10px; }
+    .tracks { padding: 0 12px 12px; }
+    .links { grid-template-columns: repeat(3, 1fr); }   /* 3×2 is shorter than 2×3 */
+    .link { padding: 14px 6px; gap: 7px; }
+    .link .l-v { font-size: 11px; }
+  }
+  /* short viewports (landscape phones / small laptops) — trim further so nothing clips */
+  @media (max-height: 720px) {
+    .hub { padding-top: 52px; padding-bottom: 52px; }
+    .mod-header { padding: 16px 14px 14px; gap: 8px; }
+    .hub-wm { width: min(190px, 50vw); }
+    .link { padding: 12px 6px; }
+  }
+  @media (max-height: 600px) {
+    .hub-type { display: none; }            /* drop the typed line when vertical space is scarce */
+    .hub { padding-top: 44px; padding-bottom: 44px; }
+    .mod-header { padding: 12px 14px; gap: 6px; }
+    .hub-wm { width: min(170px, 44vw); }
+    .player { padding: 10px 12px; }
+    .link { padding: 9px 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #boot-logo, .blip, .hub-type .cur { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="webgl"></canvas>
+  <div id="vignette"></div>
+  <div id="grain"></div>
+
+  <!-- ════ BOOT ════ -->
+  <div id="boot">
+    <div id="boot-logo"></div>
+    <div id="boot-console">
+      <div id="boot-lines"></div>
+      <div id="boot-bar-wrap"><div id="boot-bar"></div></div>
+    </div>
+  </div>
+
+  <!-- ════ STAGE ════ -->
+  <main id="stage">
+    <div class="rail">
+      <div class="mono-mark"></div>
+      <div><span class="dot">&#9670;</span> SIGNAL ACTIVE &nbsp;//&nbsp; <span id="clock">--:--:--</span></div>
+    </div>
+
+    <div class="hub">
+      <div class="module" id="module">
+        <div class="mod-header">
+          <div class="mod-kicker">&#9670; HEAVENLINK CONSOLE</div>
+          <img class="hub-wm" id="h-wm" src="wordmark.png" alt="FOUR FOUR FOUR">
+          <div class="hub-type"><span id="typewriter"></span><span class="cur">&#9608;</span></div>
+        </div>
+        <div class="mod-label">
+          <span>// Transmissions</span>
+          <span class="live"><span id="tx-state">Standby</span><span class="blip"></span></span>
+        </div>
+        <div class="player" id="tx">
+          <div class="p-btn p-play" id="tx-play" role="button" aria-label="Play / Pause"><svg viewBox="0 0 24 24"><path id="tx-play-icon" d="M8 5v14l11-7z"/></svg></div>
+          <div class="p-mid">
+            <div class="p-top">
+              <span class="p-title" id="tx-title">ENIGMA DEMO</span>
+              <span class="p-time"><span id="tx-cur">0:00</span> / <span id="tx-dur">0:00</span></span>
+            </div>
+            <canvas class="p-viz" id="tx-viz"></canvas>
+          </div>
+          <div class="p-btn p-next" id="tx-next" role="button" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5l11 7L4 19z"/></svg></div>
+        </div>
+        <div class="tracks" id="tx-list"></div>
+
+        <div class="links">
+          <a class="link" href="https://www.instagram.com/itsfourfourfour/" target="_blank" rel="noopener"><span class="l-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg></span><span class="l-v">Instagram</span></a>
+          <a class="link" href="https://soundcloud.com/itsfourfourfour" target="_blank" rel="noopener"><span class="l-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.999 14.165c-.052 1.796-1.612 3.169-3.4 3.169h-8.18a.68.68 0 0 1-.675-.683V7.862a.747.747 0 0 1 .452-.724s.75-.513 2.333-.513a5.364 5.364 0 0 1 2.763.755 5.433 5.433 0 0 1 2.57 3.54c.282-.08.574-.121.868-.12.884 0 1.73.358 2.347.992s.948 1.49.922 2.373ZM10.721 8.421c.247 2.98.427 5.697 0 8.672a.264.264 0 0 1-.53 0c-.395-2.946-.22-5.718 0-8.672a.264.264 0 0 1 .53 0ZM9.072 9.448c.285 2.659.37 4.986-.006 7.655a.277.277 0 0 1-.55 0c-.331-2.63-.256-5.02 0-7.655a.277.277 0 0 1 .556 0Zm-1.663-.257c.27 2.726.39 5.171 0 7.904a.266.266 0 0 1-.532 0c-.38-2.69-.257-5.21 0-7.904a.266.266 0 0 1 .532 0Zm-1.647.77a26.108 26.108 0 0 1-.008 7.147.272.272 0 0 1-.542 0 27.955 27.955 0 0 1 0-7.147.275.275 0 0 1 .55 0Zm-1.67 1.769c.421 1.865.228 3.5-.029 5.388a.257.257 0 0 1-.514 0c-.21-1.858-.398-3.549 0-5.389a.272.272 0 0 1 .543 0Zm-1.655-.273c.388 1.897.26 3.508-.01 5.412-.026.28-.514.283-.54 0-.244-1.878-.347-3.54-.01-5.412a.283.283 0 0 1 .56 0Zm-1.668.911c.4 1.268.257 2.292-.026 3.572a.257.257 0 0 1-.514 0c-.241-1.262-.354-2.312-.023-3.572a.283.283 0 0 1 .563 0Z"/></svg></span><span class="l-v">SoundCloud</span></a>
+          <a class="link" href="https://spotify.com" target="_blank" rel="noopener"><span class="l-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg></span><span class="l-v">Spotify</span></a>
+          <a class="link" href="https://music.apple.com" target="_blank" rel="noopener"><span class="l-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.193.4-1.336.53-2.3 1.452-2.865 2.78-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18 0 .032-.007.062-.01.093v12.223c.01.14.017.283.027.424.05.815.154 1.624.497 2.373.65 1.42 1.738 2.353 3.234 2.801.42.127.856.187 1.293.228.555.053 1.11.06 1.667.06h11.03a12.5 12.5 0 001.57-.1c.822-.106 1.596-.35 2.295-.81a5.046 5.046 0 001.88-2.207c.186-.42.293-.87.37-1.324.113-.675.138-1.358.137-2.04-.002-3.8 0-7.595-.003-11.393zm-6.423 3.99v5.712c0 .417-.058.827-.244 1.206-.29.59-.76.962-1.388 1.14-.35.1-.706.157-1.07.173-.95.045-1.773-.6-1.943-1.536a1.88 1.88 0 011.038-2.022c.323-.16.67-.25 1.018-.324.378-.082.758-.153 1.134-.24.274-.063.457-.23.51-.516a.904.904 0 00.02-.193c0-1.815 0-3.63-.002-5.443a.725.725 0 00-.026-.185c-.04-.15-.15-.243-.304-.234-.16.01-.318.035-.475.066-.76.15-1.52.303-2.28.456l-2.325.47-1.374.278c-.016.003-.032.01-.048.013-.277.077-.377.203-.39.49-.002.042 0 .086 0 .13-.002 2.602 0 5.204-.003 7.805 0 .42-.047.836-.215 1.227-.278.64-.77 1.04-1.434 1.233-.35.1-.71.16-1.075.172-.96.036-1.755-.6-1.92-1.544-.14-.812.23-1.685 1.154-2.075.357-.15.73-.232 1.108-.31.287-.06.575-.116.86-.177.383-.083.583-.323.6-.714v-.15c0-2.96 0-5.922.002-8.882 0-.123.013-.25.042-.37.07-.285.273-.448.546-.518.255-.066.515-.112.774-.165.733-.15 1.466-.296 2.2-.444l2.27-.46c.67-.134 1.34-.27 2.01-.403.22-.043.442-.088.663-.106.31-.025.523.17.554.482.008.073.012.148.012.223.002 1.91.002 3.822 0 5.732z"/></svg></span><span class="l-v">Apple Music</span></a>
+          <a class="link" href="https://www.patreon.com/c/itsfourfourfour" target="_blank" rel="noopener"><span class="l-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.957 7.21c-.004-3.064-2.391-5.576-5.191-6.482-3.478-1.125-8.064-.962-11.384.604C2.357 3.231 1.093 7.391 1.046 11.54c-.039 3.411.302 12.396 5.369 12.46 3.765.047 4.326-4.804 6.068-7.141 1.24-1.662 2.836-2.132 4.801-2.618 3.376-.836 5.678-3.501 5.673-7.031Z"/></svg></span><span class="l-v">Patreon</span></a>
+          <a class="link" href="mailto:connect@fourfourfour.net"><span class="l-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></span><span class="l-v">Email</span></a>
+        </div>
+      </div>
+    </div>
+
+    <footer class="foot">
+      <span>FOURFOURFOUR <span class="dot">//</span> v1.1</span>
+      <span><span id="popcount">8,231,600,000</span> USERS</span>
+    </footer>
+  </main>
+
+  <script>
+    document.documentElement.style.setProperty('--wm', "url(wordmark.png)");
+  </script>
+
+  <!-- ════════ WEBGL BACKDROP ════════ -->
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from './vendor/jsm/postprocessing/EffectComposer.js';
+    import { RenderPass } from './vendor/jsm/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from './vendor/jsm/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from './vendor/jsm/postprocessing/OutputPass.js';
+    import { GLTFLoader } from './vendor/jsm/loaders/GLTFLoader.js';
+    import { BokehPass } from './vendor/jsm/postprocessing/BokehPass.js';
+    import { ShaderPass } from './vendor/jsm/postprocessing/ShaderPass.js';
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const canvas = document.getElementById('webgl');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));  // 1:1 — fill-rate is the bottleneck with bloom+DoF
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+
+    const scene = new THREE.Scene();
+
+    const bg = document.createElement('canvas'); bg.width = 4; bg.height = 512;
+    const g = bg.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 0, 512);
+    grad.addColorStop(0.0, '#22324c'); grad.addColorStop(0.42, '#1A2332'); grad.addColorStop(1.0, '#080b11');
+    g.fillStyle = grad; g.fillRect(0, 0, 4, 512);
+    const bgTex = new THREE.CanvasTexture(bg); bgTex.colorSpace = THREE.SRGBColorSpace;
+    scene.background = bgTex;
+    scene.fog = new THREE.FogExp2(0x0b0f16, 0.045);
+
+    const RELIC_R = 11.0;                  // model normalized to this bounding radius
+    const CAM_Z = 0.4;                     // camera sits INSIDE, pinned on the spin axis (Z), close to centre
+    // shorter focal length / wider lens (~8mm ≈ 114deg FOV); deep inside the shape
+    const camera = new THREE.PerspectiveCamera(114, window.innerWidth / window.innerHeight, 0.02, 200);
+    camera.position.set(0, 0, CAM_Z);
+    camera.lookAt(0, 0, 0);
+
+    // palette-only reflection environment — a vertical gradient through the brand colours, so the
+    // chrome can only ever reflect glacier/ice/arctic/midnight (no off-palette hues)
+    const envC = document.createElement('canvas'); envC.width = 8; envC.height = 256;
+    const ectx = envC.getContext('2d');
+    const eg = ectx.createLinearGradient(0, 0, 0, 256);
+    eg.addColorStop(0.00, '#E8F0FA');   // near-white cool highlight (bright bits = blue-white)
+    eg.addColorStop(0.32, '#C2D6EC');   // light blue-white — dominant band
+    eg.addColorStop(0.70, '#7E9DBE');   // soft arctic blue
+    eg.addColorStop(1.00, '#34485C');   // chrome slate floor
+    ectx.fillStyle = eg; ectx.fillRect(0, 0, 8, 256);
+    const envTex = new THREE.CanvasTexture(envC);
+    envTex.mapping = THREE.EquirectangularReflectionMapping;
+    envTex.colorSpace = THREE.SRGBColorSpace;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromEquirectangular(envTex).texture;
+    envTex.dispose();
+
+    const key = new THREE.DirectionalLight(0xEEF2F5, 2.6); key.position.set(4, 6, 5); scene.add(key);
+    const rim = new THREE.DirectionalLight(0x8fb0c8, 2.4); rim.position.set(-6, -2, -4); scene.add(rim);
+    const fill = new THREE.PointLight(0x9fc4e6, 11, 50); fill.position.set(0, -3, 4); scene.add(fill);  // bright light-blue fill
+    scene.add(new THREE.HemisphereLight(0xA8C2DE, 0x1A2332, 0.7));   // cohesive cool blue-white ambient
+
+    // ── wispies: decimated GLB of the client's deformed torus knot ──
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: 0xC2D4E8, metalness: 1.0, roughness: 0.44,   // cool blue-white tint; bright bits read blue + white
+      envMapIntensity: 2.6, side: THREE.DoubleSide
+    });
+    const relic = new THREE.Group();
+    scene.add(relic);
+    new GLTFLoader().load('wispies.glb', (gltf) => {
+      gltf.scene.traverse((o) => { if (o.isMesh) o.material = mat; });
+      // GLB is already centroid-centered; just normalize scale (no re-shift, or we'd undo the centering)
+      const sph = new THREE.Box3().setFromObject(gltf.scene).getBoundingSphere(new THREE.Sphere());
+      gltf.scene.scale.setScalar(RELIC_R / sph.radius);
+      relic.add(gltf.scene);
+    });
+
+    // soft circular sprite so floaters are round dots, not square pixels
+    const dotC = document.createElement('canvas'); dotC.width = dotC.height = 64;
+    const dctx = dotC.getContext('2d');
+    const dg = dctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    dg.addColorStop(0, 'rgba(255,255,255,1)'); dg.addColorStop(0.45, 'rgba(255,255,255,0.65)'); dg.addColorStop(1, 'rgba(255,255,255,0)');
+    dctx.fillStyle = dg; dctx.beginPath(); dctx.arc(32, 32, 32, 0, Math.PI * 2); dctx.fill();
+    const dotTex = new THREE.CanvasTexture(dotC);
+
+    const N = 320, pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) { pos[i*3]=(Math.random()-0.5)*22; pos[i*3+1]=(Math.random()-0.5)*22; pos[i*3+2]=(Math.random()-0.5)*14-3; }
+    const pGeo = new THREE.BufferGeometry(); pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const motes = new THREE.Points(pGeo, new THREE.PointsMaterial({
+      color: 0xB8C8D4, size: 0.05, map: dotTex, alphaMap: dotTex,
+      transparent: true, opacity: 0.55, depthWrite: false
+    }));
+    scene.add(motes);
+
+    // 8x MSAA target (8-bit, cheap — NOT half-float; clamps to GPU max) to kill the thin-strand aliasing
+    const msTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { samples: 8 });
+    const composer = new EffectComposer(renderer, msTarget);
+    composer.addPass(new RenderPass(scene, camera));
+    // depth of field — focus near the front of the shape, blur the parts further away
+    const bokeh = new BokehPass(scene, camera, { focus: 4.5, aperture: 0.00022, maxblur: 0.004 });
+    composer.addPass(bokeh);
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.3, 0.6, 0.6));
+    // lens-style field curvature: sharp in the centre, softening toward the screen edges
+    const RadialBlurShader = {
+      uniforms: { tDiffuse: { value: null }, uResolution: { value: new THREE.Vector2(1, 1) },
+                  uAspect: { value: new THREE.Vector2(1, 1) }, uStrength: { value: 6.0 }, uSat: { value: 1.0 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: `
+        uniform sampler2D tDiffuse; uniform vec2 uResolution; uniform vec2 uAspect; uniform float uStrength; uniform float uSat;
+        varying vec2 vUv;
+        void main(){
+          vec2 c = (vUv - 0.5) * uAspect; float r = length(c);
+          float m = smoothstep(0.5, 1.05, r); m = m * m;       // fully sharp centre; blur grows toward the edges
+          vec2 s = (uStrength * m) / uResolution;              // per-cell step (uv)
+          vec3 col = vec3(0.0);
+          for (float i = -2.0; i <= 2.0; i += 1.0) {           // dense 5x5 box -> smooth, no mosaic
+            for (float j = -2.0; j <= 2.0; j += 1.0) {
+              col += texture2D(tDiffuse, vUv + vec2(i, j) * s).rgb;
+            }
+          }
+          col /= 25.0;
+          float L = dot(col, vec3(0.2126, 0.7152, 0.0722));
+          col = mix(vec3(L), col, uSat);
+          gl_FragColor = vec4(col, 1.0);
+        }`
+    };
+    const radial = new ShaderPass(RadialBlurShader);
+    const setRadial = () => { radial.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+                              radial.uniforms.uAspect.value.set(window.innerWidth / window.innerHeight, 1); };
+    setRadial();
+    composer.addPass(radial);
+    composer.addPass(new OutputPass());
+
+    const tgt = { x: 0, y: 0 }, cur = { x: 0, y: 0 };
+    window.addEventListener('pointermove', (e) => { tgt.x = (e.clientX/window.innerWidth-0.5); tgt.y = (e.clientY/window.innerHeight-0.5); });
+    // audio reactivity hook — boot/UI script sets window.__txLevel 0..1
+    window.__txLevel = 0;
+
+    const clock = new THREE.Clock();
+    let running = true;
+    document.addEventListener('visibilitychange', () => { running = !document.hidden; if (running) clock.getDelta(); });
+
+    function resize() {
+      const w = window.innerWidth, h = window.innerHeight;
+      camera.aspect = w/h; camera.updateProjectionMatrix();
+      renderer.setSize(w, h); composer.setSize(w, h); setRadial();
+    }
+    window.addEventListener('resize', resize);
+
+    function tick() {
+      requestAnimationFrame(tick);
+      if (!running) return;
+      const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+
+      // roll the shape about Z — the camera is ON the Z axis, so every point's distance to it is
+      // invariant under this rotation: the geometry can sweep around but never reach the camera
+      if (!reduce) relic.rotation.z += dt * 0.08;
+
+      motes.rotation.y += dt * 0.01;
+      motes.position.y = (t * 0.06) % 4;
+
+      // camera stays pinned on the spin axis; the mouse only tilts the gaze (no position change) -> still safe
+      cur.x += (tgt.x - cur.x) * 0.035; cur.y += (tgt.y - cur.y) * 0.035;
+      camera.position.set(0, 0, CAM_Z);
+      camera.lookAt(cur.x * 0.022, -cur.y * 0.018, 0);
+
+      composer.render();
+    }
+    tick();
+    window.__glReady = true;
+  </script>
+
+  <!-- ════════ BOOT + UI + AUDIO ════════ -->
+  <script>
+  (function () {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ── shortened boot (≈ half the original) ── */
+    const boot = document.getElementById('boot');
+    const bootLogo = document.getElementById('boot-logo');
+    const bootLines = document.getElementById('boot-lines');
+    const barWrap = document.getElementById('boot-bar-wrap');
+    const bar = document.getElementById('boot-bar');
+    const stage = document.getElementById('stage');
+
+    /* pin the intro logo onto the loaded wordmark's exact rect so it never jumps on the handoff */
+    const wmImg = document.getElementById('h-wm');
+    const moduleEl = document.getElementById('module');
+    function placeBootLogo() {
+      const prev = moduleEl.style.transform;
+      moduleEl.style.transform = 'none';          // measure the module's FINAL (revealed) position, not the slid-down one
+      const r = wmImg.getBoundingClientRect();
+      moduleEl.style.transform = prev;
+      if (!r.width || !r.height) return;
+      bootLogo.style.transform = 'none';
+      bootLogo.style.left = r.left + 'px';
+      bootLogo.style.top = r.top + 'px';
+      bootLogo.style.width = r.width + 'px';
+      bootLogo.style.height = r.height + 'px';
+    }
+    if (wmImg.complete) placeBootLogo(); else wmImg.addEventListener('load', placeBootLogo);
+    window.addEventListener('resize', placeBootLogo);
+
+    const MAXLN = 26;                              // keep the console DOM bounded
+    const rng  = (a, b) => a + Math.random() * (b - a);
+    const pick = a => a[Math.floor(Math.random() * a.length)];
+    const hex  = n => { let s = ''; for (let i = 0; i < n; i++) s += '0123456789abcdef'[Math.floor(Math.random()*16)]; return s; };
+    function emit(text, cls) {
+      const div = document.createElement('div');
+      div.className = 'ln' + (cls ? ' ' + cls : '');
+      div.textContent = text;
+      bootLines.appendChild(div);
+      while (bootLines.children.length > MAXLN) bootLines.removeChild(bootLines.firstChild);
+    }
+
+    /* ── Phase 1 — the paced HEAVENLINK boot (typed, the part he loves) ── */
+    const headLines = [
+      '// INITIALIZING HEAVENLINK SYSTEM',
+      '// LOADING AUDIO MATRIX',
+      '// ESTABLISHING UPLINK',
+      '// SYNCING TRANSMISSION RELAY',
+      '// CALIBRATING SIGNAL INTEGRITY',
+    ];
+    function typeHead(i, done) {
+      if (i >= headLines.length) { done(); return; }
+      const div = document.createElement('div'); div.className = 'ln head'; bootLines.appendChild(div);
+      const text = headLines[i]; let c = 0;
+      (function ch() {
+        if (c < text.length) { div.textContent += text[c++]; setTimeout(ch, reduce ? 4 : rng(16, 30)); }
+        else { bar.style.width = Math.round((i + 1) / headLines.length * 52) + '%';
+               setTimeout(() => typeHead(i + 1, done), reduce ? 40 : rng(150, 300)); }
+      })();
+    }
+
+    /* ── Phase 2 — the flood: a torrent of console lines, piling up faster and faster ── */
+    const MODS  = ['seraph','halo','vox','relay','choir','aether','cipher','beacon','psalm','umbra','oracle','matrix','signal','ascension'];
+    const VERBS = ['mount','link','verify','cache','stream','decode','bind','sync','flush','probe','align','spool','resolve'];
+    function floodLine() {
+      switch (Math.floor(Math.random() * 6)) {
+        case 0:  return [`[OK] ${pick(MODS)}.node 0x${hex(4)} registered`, 'ok'];
+        case 1:  return [`>> ${pick(VERBS)} /heaven/${pick(MODS)}/${hex(2)} ... ${pick(['ok','done','204b','512b','1.2k'])}`, 'sys'];
+        case 2:  return [`chk ${hex(8)} :: ${pick(['verified','passed','sealed'])}`, 'sys'];
+        case 3:  return [`relay ${hex(3)}>${hex(3)} | ${Math.floor(rng(8,72))}ms`, 'sys'];
+        case 4:  return [`audio.buffer ${pick(['44.1','48.0'])}khz / ${pick(['256','512','1024'])} ${pick(['ok','locked'])}`, 'sys'];
+        default: return [`:: ${pick(MODS)} ascension +${Math.floor(rng(100,999))}`, 'sys'];
+      }
+    }
+    function flood(done) {
+      let n = 0; const total = reduce ? 10 : 80;
+      (function step() {
+        const burst = 1 + Math.floor(n / 22);                 // accelerate — more lines per tick over time
+        for (let k = 0; k < burst && n < total; k++) { const [t, c] = floodLine(); emit(t, c); n++; }
+        bar.style.width = Math.round(52 + (n / total) * 48) + '%';
+        if (n < total) setTimeout(step, reduce ? 30 : Math.max(8, 26 - n * 0.22));
+        else done();
+      })();
+    }
+
+    /* ── Phase 3 — calm: the storm settles into the secured state ── */
+    function calm(done) {
+      bar.style.width = '100%';
+      setTimeout(() => { emit('', ''); emit('// CONNECTION SECURED', 'secured'); }, 280);
+      setTimeout(() => emit('// WELCOME', 'secured'), 760);
+      setTimeout(done, reduce ? 500 : 1350);
+    }
+
+    function finishBoot() {
+      placeBootLogo();                            // re-pin to the exact final rect right before the handoff
+      boot.classList.add('gone'); stage.classList.add('in'); startHub();
+      setTimeout(() => boot.remove(), 800);
+    }
+    function runBoot() {
+      placeBootLogo();
+      bootLogo.style.transition = 'opacity 0.45s'; bootLogo.style.opacity = '1';
+      setTimeout(() => {
+        bootLines.style.transition = barWrap.style.transition = 'opacity 0.3s';
+        bootLines.style.opacity = barWrap.style.opacity = '1';
+        typeHead(0, () => flood(() => calm(finishBoot)));
+      }, reduce ? 120 : 520);
+    }
+    setTimeout(runBoot, 250);
+
+    /* ── hub reveal + typewriter ── */
+    function startHub() {
+      setTimeout(() => document.getElementById('module').classList.add('reveal'), 200);
+      setTimeout(typewriter, 760);
+    }
+    // friendly console voice — brand-kit flavored lines that cycle in the hub
+    const HUB_LINES = [
+      'welcome to the higher calling',
+      'signal locked // you are tuned in',
+      'transmission received, traveler',
+      'between violence and beauty',
+      'through the storm, not beyond it',
+      'the relay is warm — stay a while',
+      'celestial curiosity engaged',
+      'you found the frequency',
+      'the choir is listening',
+    ];
+    function typewriter() {
+      const el = document.getElementById('typewriter');
+      if (reduce) { el.textContent = HUB_LINES[0]; return; }
+      let li = 0;
+      function type() {
+        const msg = HUB_LINES[li]; let i = 0;
+        (function ch() {
+          el.textContent = msg.slice(0, i++);
+          if (i <= msg.length) setTimeout(ch, 42 + Math.random() * 28);
+          else setTimeout(erase, 2300);
+        })();
+      }
+      function erase() {
+        const full = el.textContent; let i = full.length;
+        (function ch() {
+          el.textContent = full.slice(0, i);
+          if (i-- > 0) setTimeout(ch, 22);
+          else { li = (li + 1) % HUB_LINES.length; setTimeout(type, 380); }
+        })();
+      }
+      type();
+    }
+
+    /* ── clock ── */
+    const clockEl = document.getElementById('clock');
+    (function tickClock(){ const d=new Date(), p=n=>String(n).padStart(2,'0');
+      clockEl.textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+      setTimeout(tickClock, 1000); })();
+
+    /* ── live world-population counter (≈8.23B at base epoch, net +2.3/sec) ── */
+    const popEl = document.getElementById('popcount');
+    const POP_BASE = 8_231_600_000;                 // ~world population, 2026-06-18 00:00 UTC
+    const POP_EPOCH = Date.UTC(2026, 5, 18, 0, 0, 0) / 1000;
+    const POP_RATE = 2.3;                            // net births-minus-deaths per second
+    (function popTick(){
+      const now = Date.now() / 1000;
+      const pop = Math.floor(POP_BASE + (now - POP_EPOCH) * POP_RATE);
+      popEl.textContent = pop.toLocaleString('en-US');
+      setTimeout(popTick, 400);
+    })();
+
+    /* ════ TRANSMISSIONS (compact) ════ */
+    const TX = [
+      { title: 'ENIGMA DEMO',   tag: 'ENIGMA',   src: 'audio/444-enigma-demo.m4a' },
+      { title: 'FADEAWAY DEMO', tag: 'FADEAWAY', src: 'audio/444-fadeaway-demo.m4a' },
+      { title: 'NRG DEMO',      tag: 'NRG',      src: 'audio/444-nrg-demo.m4a' },
+    ];
+    const audio = new Audio(); audio.preload = 'metadata';
+    let idx = 0, ctx, analyser, freq;
+
+    const elList = document.getElementById('tx-list');
+    const elTitle = document.getElementById('tx-title');
+    const elState = document.getElementById('tx-state');
+    const elCur = document.getElementById('tx-cur');
+    const elDur = document.getElementById('tx-dur');
+    const elIcon = document.getElementById('tx-play-icon');
+    const player = document.getElementById('tx');
+    const viz = document.getElementById('tx-viz');
+    const vctx = viz.getContext('2d');
+
+    const fmt = s => { if (!isFinite(s)) return '0:00'; const m=Math.floor(s/60),x=Math.floor(s%60); return `${m}:${String(x).padStart(2,'0')}`; };
+
+    TX.forEach((t, i) => {
+      const pill = document.createElement('div');
+      pill.className = 'pill' + (i===0 ? ' active' : ''); pill.textContent = t.tag;
+      pill.addEventListener('click', () => { load(i); play(); });
+      elList.appendChild(pill);
+    });
+    function setActive(){ [...elList.children].forEach((p,i)=>p.classList.toggle('active', i===idx)); }
+    function load(i){ idx=(i+TX.length)%TX.length; audio.src=TX[idx].src; elTitle.textContent=TX[idx].title; setActive(); }
+    function ensureGraph(){
+      if (ctx) return;
+      ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const sn = ctx.createMediaElementSource(audio);
+      analyser = ctx.createAnalyser(); analyser.fftSize = 128; freq = new Uint8Array(analyser.frequencyBinCount);
+      sn.connect(analyser); analyser.connect(ctx.destination);
+    }
+    function play(){ ensureGraph(); if (ctx.state==='suspended') ctx.resume(); audio.play(); }
+    function toggle(){ audio.paused ? play() : audio.pause(); }
+
+    audio.addEventListener('play', () => { elIcon.setAttribute('d','M6 5h4v14H6zM14 5h4v14h-4z'); elState.textContent='Broadcasting'; player.classList.add('playing'); });
+    audio.addEventListener('pause', () => { elIcon.setAttribute('d','M8 5v14l11-7z'); elState.textContent='Standby'; player.classList.remove('playing'); });
+    audio.addEventListener('ended', () => { load(idx+1); play(); });
+    audio.addEventListener('loadedmetadata', () => { elDur.textContent = fmt(audio.duration); });
+    audio.addEventListener('timeupdate', () => { elCur.textContent = fmt(audio.currentTime); });
+
+    document.getElementById('tx-play').addEventListener('click', toggle);
+    document.getElementById('tx-next').addEventListener('click', () => { load(idx+1); play(); });
+    load(0);
+
+    /* ── waveform viz + drive the 3D relic ── */
+    function sizeViz(){ const dpr=Math.min(window.devicePixelRatio,2); vctx.setTransform(1,0,0,1,0,0); viz.width=viz.clientWidth*dpr; viz.height=viz.clientHeight*dpr; vctx.scale(dpr,dpr); }
+    window.addEventListener('resize', sizeViz); setTimeout(sizeViz, 50);
+    const BARS = 42;
+    const levels = new Float32Array(BARS);   // persisted across frames so we can lerp
+    (function draw(){
+      requestAnimationFrame(draw);
+      const w=viz.clientWidth, h=viz.clientHeight; if (!w) return;
+      vctx.clearRect(0,0,w,h);
+      const gap=2, bw=(w-(BARS-1)*gap)/BARS;
+      const live = analyser && !audio.paused;
+      if (live) analyser.getByteFrequencyData(freq);
+      let sum=0;
+      for (let i=0;i<BARS;i++){
+        const target = live ? (freq[Math.floor(i/BARS*freq.length)]/255)
+                            : (0.05 + 0.03*Math.sin(i*0.6 + Date.now()/600));
+        // asymmetric lerp — quick attack, gentle release so bars move musically, not jittery
+        const k = target > levels[i] ? 0.5 : 0.12;
+        levels[i] += (target - levels[i]) * k;
+        sum += levels[i];
+        const bh=Math.max(1.5, levels[i]*h);
+        const grd=vctx.createLinearGradient(0,h,0,h-bh); grd.addColorStop(0,'#5B7A95'); grd.addColorStop(1,'#EEF2F5');
+        vctx.fillStyle=grd; vctx.fillRect(i*(bw+gap), h-bh, bw, bh);
+      }
+      window.__txLevel = audio.paused ? (window.__txLevel||0)*0.9 : (sum/BARS);
+    })();
+  })();
+  </script>
+</body>
+</html>
