@@ -39,6 +39,9 @@
     --display: 'Audiowide', sans-serif;
     --primary: 'Inter', system-ui, sans-serif;
     --mono:    'JetBrains Mono', ui-monospace, monospace;
+
+    /* angular "HUD" panel silhouette — chamfered corners, a notched top-right, an angled bottom-left (voltra-inspired) */
+    --hud-shape: polygon(0 15px, 15px 0, calc(100% - 34px) 0, calc(100% - 18px) 16px, 100% 16px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 34px 100%, 0 calc(100% - 30px));
   }
 
   html, body { height: 100%; }
@@ -60,45 +63,204 @@
   #grain   { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0.05; mix-blend-mode: screen;
              background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.5) 0 1px, transparent 1px 3px); }
 
-  /* ════════ BOOT ════════ */
+  /* ════════ BOOT — content "initializing": the real relic loads in (wireframe) behind a console + the menu skeleton, then a white flash reveals the live UI ════════ */
   #boot {
-    position: fixed; inset: 0; z-index: 50; background: var(--void);
-    transition: opacity 0.7s ease;
+    position: fixed; inset: 0; z-index: 50; overflow: hidden;
+    background: #000;                                /* starts completely black; fades to a veil so the WebGL relic shows through behind */
+    transition: background-color 1.4s ease;
   }
-  #boot.gone { opacity: 0; pointer-events: none; }
-  /* the intro logo is positioned (in JS) to match the loaded wordmark exactly, so it never jumps */
+  #boot.gone { opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+  /* CRT scanlines over the whole boot for the "rendered on a monitor" feel — subtle, darkens only the thin lines */
+  #boot::after {
+    content: ''; position: absolute; inset: 0; z-index: 5; pointer-events: none; opacity: 0.3;
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(4,7,12,0.5) 2px 3px);
+  }
+
+  /* the intro logo (masked wordmark) — strobes in, pinned (in JS) to the final wordmark rect so it never jumps */
   #boot-logo {
     position: fixed; left: 50%; top: 38%; transform: translateX(-50%); width: 250px; height: 61px; background: var(--glacier);
     -webkit-mask: var(--wm) center / contain no-repeat; mask: var(--wm) center / contain no-repeat;
-    opacity: 0; filter: drop-shadow(0 0 18px rgba(91,122,149,0.55)); animation: breathe 3.4s ease-in-out infinite;
+    opacity: 0; filter: drop-shadow(0 0 18px rgba(91,122,149,0.55)); z-index: 3;
   }
+
+  /* content-module skeleton — pinned (in JS) to the final module rect, then builds top→down behind a scanline */
+  #skel-module {
+    position: fixed; opacity: 0; z-index: 2; overflow: hidden;
+    clip-path: var(--hud-shape); -webkit-clip-path: var(--hud-shape);   /* match the real panel's chamfered silhouette */
+    border: 1px solid var(--hair-bright);
+    background: linear-gradient(180deg, rgba(91,122,149,0.06), rgba(12,17,24,0.18));
+    transition: opacity 0.7s ease;                 /* smooth fade-in (no strobe) */
+  }
+  /* the build wrapper is clipped from the bottom; revealing it downward "draws" the lines in */
+  #skel-build { position: absolute; inset: 0; clip-path: inset(0 0 100% 0); -webkit-clip-path: inset(0 0 100% 0); }
+  #skel-module .sk { position: absolute; left: 0; right: 0; }
+  /* dashed divider lines that draw in as the scan passes */
+  #skel-module .sk-line {
+    height: 1px; box-shadow: 0 0 6px rgba(184,200,212,0.22);
+    background: repeating-linear-gradient(90deg, rgba(184,200,212,0.45) 0 7px, transparent 7px 12px);
+  }
+  /* registration brackets at the module corners */
+  #skel-module .sk-brk { position: absolute; width: 13px; height: 13px; border: 0 solid var(--ice-mist); opacity: 0.7; }
+  #skel-module .sk-brk.tl { top: 5px; left: 5px;  border-top-width: 1px; border-left-width: 1px; }
+  #skel-module .sk-brk.tr { top: 5px; right: 5px; border-top-width: 1px; border-right-width: 1px; }
+  #skel-module .sk-brk.bl { bottom: 5px; left: 5px;  border-bottom-width: 1px; border-left-width: 1px; }
+  #skel-module .sk-brk.br { bottom: 5px; right: 5px; border-bottom-width: 1px; border-right-width: 1px; }
+  /* player pane placeholder: a play-button square + a waveform crosshair (matches the real player band ~35–46%) */
+  #skel-module .sk-player { top: 35%; height: 11%; left: 7%; right: 7%; display: flex; align-items: center; gap: 7%; padding: 0 6%;
+    border: 1px solid var(--hair-bright); background: rgba(184,200,212,0.03); }
+  #skel-module .sk-sq { flex: none; height: 60%; aspect-ratio: 1; border: 1px solid var(--ice-mist); opacity: 0.6; }
+  #skel-module .sk-cross { position: relative; flex: 1; height: 64%; }
+  #skel-module .sk-cross::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--hair-bright); }
+  #skel-module .sk-cross::after  { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--hair-bright); }
+  /* track-pill row placeholder (matches the real 3 pills ~48–53%) */
+  #skel-module .sk-tracks { top: 48%; height: 5%; left: 7%; right: 7%; display: flex; gap: 5px; }
+  #skel-module .sk-tracks span { flex: 1; border: 1px solid var(--hair-bright); background: rgba(184,200,212,0.03); }
+  /* links grid placeholder — 2 cols × 3 rows, bottom ~44% (matches the real social grid) */
+  #skel-module .sk-grid {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 44%;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
+    background: var(--hair); border-top: 1px solid var(--hair-bright);
+  }
+  /* each link cell gets a faint center "+" registration mark (echoes the reference's pane placeholders) */
+  #skel-module .sk-grid span { position: relative; background: rgba(184,200,212,0.04); }
+  #skel-module .sk-grid span::before {
+    content: ''; position: absolute; inset: 0; margin: auto; width: 9px; height: 9px; opacity: 0.85;
+    background: linear-gradient(var(--ice-mist),var(--ice-mist)) center/1px 9px no-repeat,
+                linear-gradient(var(--ice-mist),var(--ice-mist)) center/9px 1px no-repeat;
+  }
+  #skel-module .sk-grid.lit span { animation: cellLit 0.55s ease; }
+  @keyframes cellLit { 0%,100%{ background: rgba(184,200,212,0.04); } 38%{ background: rgba(184,200,212,0.30); } }
+  /* the scanline rides the leading edge of the build */
+  #scanline {
+    position: absolute; left: -1px; right: -1px; top: 0; height: 2px; opacity: 0;
+    background: linear-gradient(90deg, transparent, var(--ice-mist), transparent);
+    box-shadow: 0 0 16px 2px rgba(184,200,212,0.6);
+  }
+
+  /* boot console — a measured stream of the assets actually being generated/loaded */
   #boot-console {
-    position: fixed; left: 0; right: 0; top: 56%; z-index: 50;
-    display: flex; flex-direction: column; align-items: center; gap: 20px;
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 4.5%;
+    width: min(560px, 88vw); opacity: 0; z-index: 4;
   }
-  @keyframes breathe { 0%,100%{ filter: drop-shadow(0 0 12px rgba(91,122,149,0.35)); } 50%{ filter: drop-shadow(0 0 26px rgba(184,200,212,0.7)); } }
-  /* boot console: lines stream in at the bottom, older ones scroll up and fade out the top */
   #boot-lines {
-    font-family: var(--mono); font-size: 10.5px; line-height: 1.55; letter-spacing: 0.05em;
-    color: var(--ice-mist); width: min(560px, 88vw); height: 184px; opacity: 0;
-    text-align: left; overflow: hidden;
+    font-family: var(--mono); font-size: 10.5px; line-height: 1.62; letter-spacing: 0.04em;
+    color: var(--ice-mist); height: 116px; text-align: left; overflow: hidden;
     display: flex; flex-direction: column; justify-content: flex-end;
-    -webkit-mask-image: linear-gradient(transparent 0%, #000 26%, #000 100%);
-            mask-image: linear-gradient(transparent 0%, #000 26%, #000 100%);
+    -webkit-mask-image: linear-gradient(transparent 0%, #000 34%, #000 100%);
+            mask-image: linear-gradient(transparent 0%, #000 34%, #000 100%);
   }
-  /* flex:none keeps each line at its natural height so they never shrink/overlap when flooding */
-  #boot-lines .ln { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #boot-lines .head { color: var(--ice-mist); }
-  #boot-lines .sys  { color: var(--arctic); }
-  #boot-lines .ok   { color: var(--silver); }
-  #boot-lines .secured { color: var(--glacier); letter-spacing: 0.12em; }
-  @media (max-height: 600px) { #boot-lines { height: 132px; } }
-  #boot-bar-wrap { width: min(560px, 88vw); height: 2px; background: var(--hair); opacity: 0; overflow: hidden; }
-  #boot-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--arctic), var(--ice-mist)); box-shadow: 0 0 12px rgba(184,200,212,0.8); transition: width 0.25s ease; }
+  #boot-lines .ln { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                    opacity: 0; animation: lnIn 0.2s ease forwards; }
+  @keyframes lnIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  #boot-lines .head    { color: var(--ice-mist); }
+  #boot-lines .sys     { color: var(--arctic); }
+  #boot-lines .ok      { color: var(--silver); }
+  #boot-lines .secured { color: var(--glacier); letter-spacing: 0.1em; }
+  @media (max-height: 640px) { #boot-lines { height: 92px; } #boot-console { bottom: 4%; } }
+
+  /* white flash that the live content is revealed beneath */
+  #boot-flash { position: fixed; inset: 0; z-index: 60; background: #fff; opacity: 0; pointer-events: none; }
+
+  /* ════ "initializing" overlays — abstract panels, installer dialogs & big status text scan in (reference-video feel) ════ */
+  #boot-fx { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+  /* scan-in reveal used by every fx element */
+  /* flashier: a brightness pop as the element scans open */
+  @keyframes fxScan {
+    0% { opacity: 0; clip-path: inset(0 0 100% 0); filter: brightness(2.6); }
+    45% { opacity: 1; }
+    60% { clip-path: inset(0 0 0 0); filter: brightness(2.6); }
+    74% { filter: brightness(1); }
+    100% { opacity: 1; clip-path: inset(0 0 0 0); filter: brightness(1); }
+  }
+  @keyframes fxOut  { from { opacity: 1; } to { opacity: 0; filter: blur(1.5px); transform: translateY(-3px); } }
+  /* "power-on" boot-in: flash in squished, blink out/in to full size, THEN the contents render (CRT feel) */
+  .fx-dlg.boot, .fx-rect.boot { animation: fxBootIn 0.62s steps(1, end) forwards; transform-origin: center; }
+  @keyframes fxBootIn {
+    0% { opacity: 0; transform: scaleY(0.1) scaleX(0.66); }
+    16% { opacity: 1; transform: scaleY(0.1) scaleX(0.66); }        /* squished slit flashes on */
+    30% { opacity: 0.12; transform: scaleY(0.1) scaleX(0.66); }     /* flash out */
+    44% { opacity: 1; transform: scaleY(1) scaleX(1); }             /* flash in at full size */
+    56% { opacity: 0.4; transform: scaleY(1) scaleX(1); }
+    70% { opacity: 1; transform: scaleY(1) scaleX(1); }
+    100% { opacity: 1; transform: scaleY(1) scaleX(1); }
+  }
+  /* contents fade in only after the box has settled */
+  .fx-dlg.boot > *, .fx-rect.boot > * { animation: fxContentIn 0.35s ease 0.5s both; }
+  @keyframes fxContentIn { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .fx-dlg.boot, .fx-rect.boot, .fx-dlg.boot > *, .fx-rect.boot > * { animation: none !important; } }
+
+  /* small HUD readout panel: corner ticks + label; holds either a scrolling histogram or a flooding console */
+  .fx-rect { position: fixed; opacity: 0; border: 1px solid var(--hair-bright); background: rgba(91,122,149,0.05); }
+  .fx-rect::before, .fx-rect::after { content: ''; position: absolute; width: 9px; height: 9px; border: 1px solid var(--ice-mist); opacity: 0.8; }
+  .fx-rect::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+  .fx-rect::after  { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+  .fx-rect .lbl { position: absolute; top: 6px; left: 9px; font-family: var(--mono); font-size: 7.5px;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--ice-mist); opacity: 0.85; }
+  /* scrolling telemetry histogram — solid bars, no gradient, values shift left over time */
+  .fx-rect .bars { position: absolute; left: 9px; right: 9px; bottom: 9px; top: 22px; display: flex; align-items: flex-end; gap: 2px;
+    background-image: repeating-linear-gradient(0deg, rgba(184,200,212,0.07) 0 1px, transparent 1px 9px); }
+  .fx-rect .bars i { flex: 1; background: var(--ice-mist); opacity: 0.55; height: 20%; transition: height 0.34s linear; }
+  /* flooding console — fast-scrolling log lines */
+  .fx-rect .con { position: absolute; left: 9px; right: 8px; top: 21px; bottom: 7px; overflow: hidden;
+    font-family: var(--mono); font-size: 7px; line-height: 1.5; letter-spacing: 0.02em; color: var(--arctic);
+    display: flex; flex-direction: column; justify-content: flex-end;
+    -webkit-mask-image: linear-gradient(transparent, #000 38%); mask-image: linear-gradient(transparent, #000 38%); }
+  .fx-rect .con div { white-space: nowrap; }
+  .fx-rect .con .ok { color: var(--silver); }
+  .fx-rect.in { animation: fxScan 0.5s ease forwards; }
+  .fx-rect.out { animation: fxOut 0.4s ease forwards; }
+  /* boot flash-blocks — solid white / outline rectangles that FLICKER in, hold a beat, flicker out (programmatic) */
+  .fx-blk { position: fixed; z-index: 6; pointer-events: none; opacity: 0; animation: fxFlk var(--d, 0.6s) steps(1, end) forwards; }
+  @keyframes fxFlk {
+    0% { opacity: 0; } 9% { opacity: 1; } 18% { opacity: 0.08; } 27% { opacity: 1; } 38% { opacity: 0.25; } 48% { opacity: 1; }
+    78% { opacity: 1; } 88% { opacity: 0.1; } 100% { opacity: 0; }
+  }
+
+  /* installer-style dialog box */
+  .fx-dlg {
+    position: fixed; width: min(236px, 82vw); opacity: 0; font-family: var(--mono);
+    background: rgba(12,17,24,0.86); border: 1px solid var(--hair-bright);
+    box-shadow: 0 10px 34px rgba(0,0,0,0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  }
+  .fx-dlg.in  { animation: fxScan 0.42s ease forwards; }
+  .fx-dlg.out { animation: fxOut 0.4s ease forwards; }
+  .fx-dlg-bar { display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 9px; border-bottom: 1px solid var(--hair);
+    font-size: 8.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ice-mist); }
+  .fx-dlg-bar .dots { letter-spacing: 0.12em; color: var(--glacier-ghost); }
+  .fx-dlg-body { padding: 11px 10px 12px; }
+  .fx-dlg-msg { font-size: 10px; letter-spacing: 0.04em; color: var(--glacier-dim); margin-bottom: 9px; white-space: nowrap; overflow: hidden; }
+  .fx-dlg-msg.ok { color: var(--silver); }
+  .fx-prog { height: 3px; background: var(--hair); overflow: hidden; }
+  .fx-prog > i { display: block; height: 100%; width: 0; background: var(--ice-mist); box-shadow: 0 0 8px rgba(184,200,212,0.55); }
+
+  /* large status text — rotated 90° CCW, pinned vertical along the LEFT edge (mobile-friendly, uses the tall axis) */
+  .fx-big {
+    position: fixed; left: 26px; top: 50%; transform-origin: center; white-space: nowrap; opacity: 0;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    font-family: var(--mono); font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--ice-mist); text-shadow: 0 0 16px rgba(91,122,149,0.55);
+  }
+  .fx-big.in { animation: fxBig 1.6s steps(1, end) forwards; }
+  /* flashier: hard flicker-on like a sign powering up, then a steady hold, then cut */
+  @keyframes fxBig {
+    0%,7% { opacity: 0; } 9% { opacity: 0.95; } 13% { opacity: 0.1; } 17% { opacity: 1; }
+    22% { opacity: 0.25; } 27% { opacity: 0.95; } 80% { opacity: 0.78; } 92% { opacity: 0.12; } 100% { opacity: 0; }
+  }
+  @media (max-width: 600px) { .fx-big { left: 18px; } }
+
+  /* a soft band that sweeps down to "scan in" the (subtle) wireframe relic near the end */
+  #relic-scan {
+    position: fixed; left: 0; right: 0; top: -22%; height: 22%; opacity: 0; z-index: 3; pointer-events: none;
+    background: linear-gradient(180deg, transparent, rgba(184,200,212,0.14) 70%, rgba(184,200,212,0.45));
+  }
+
+  @media (prefers-reduced-motion: reduce) { .fx-rect, .fx-dlg, .fx-big { animation: none !important; } }
 
   /* ════════ STAGE — single centered hub ════════ */
-  /* stage stays composited; the boot overlay fades out OVER it so backdrop-filter never pops */
-  #stage { position: fixed; inset: 0; z-index: 10; }
+  /* hidden during boot so the transparent boot veil reveals only the WebGL relic (not the live hub); snapped visible under the opaque white flash, which then fades to reveal it */
+  #stage { position: fixed; inset: 0; z-index: 10; opacity: 0; }
+  #stage.live { opacity: 1; }
 
   /* fixed top rail + bottom footer */
   .rail, .foot {
@@ -133,16 +295,36 @@
 
   .reveal { transform: none; }
 
-  /* ── the links module ── */
+  /* ── the vertical HUD panel (voltra-inspired): chamfered/notched silhouette, double-line edge, grid interior ── */
   .module {
-    width: min(420px, 90vw);
-    border: 1px solid var(--hair);
-    background: linear-gradient(180deg, rgba(26,35,50,0.6), rgba(12,17,24,0.62));
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    position: relative;
+    width: min(306px, 88vw);                 /* narrow → portrait/vertical */
+    clip-path: var(--hud-shape);
+    background: var(--hair-bright);           /* outer layer = the edge colour */
     transform: translateY(16px);
     transition: transform 0.75s cubic-bezier(.2,.7,.2,1);
     will-change: transform;
   }
+  /* fill, inset to leave a crisp ~1.5px edge that follows the chamfers; faint dotted grid inside */
+  .module::before {
+    content: ''; position: absolute; inset: 1.5px; z-index: 0; clip-path: var(--hud-shape);
+    background: linear-gradient(180deg, rgba(26,35,50,0.7), rgba(12,17,24,0.74));
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  /* bright glint along the top edge */
+  .module::after {
+    content: ''; position: absolute; left: 14%; right: 30%; top: 0; height: 2px; z-index: 3;
+    background: linear-gradient(90deg, transparent, rgba(232,240,250,0.9), transparent);
+  }
+  .module > * { position: relative; z-index: 2; }
+  /* HUD detailing: corner hatch + id label + cross-ticks */
+  .hud-deco { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .hud-deco .hatch { position: absolute; top: 7px; left: 16px; width: 44px; height: 7px;
+    background: repeating-linear-gradient(125deg, var(--ice-mist) 0 2px, transparent 2px 5px); opacity: 0.7; }
+  .hud-deco .hid { position: absolute; top: 5px; right: 42px; font-family: var(--mono); font-size: 7.5px;
+    letter-spacing: 0.22em; color: var(--ice-mist); opacity: 0.65; }
+  .hud-deco .plus { position: absolute; font-family: var(--mono); font-size: 11px; color: var(--ice-mist); opacity: 0.5; }
+  .hud-deco .plus.b { left: 9px; bottom: 36px; } .hud-deco .plus.r { right: 9px; top: 40%; }
   .mod-label {
     display: flex; align-items: center; justify-content: space-between;
     padding: 11px 14px; border-bottom: 1px solid var(--hair);
@@ -180,8 +362,8 @@
   .pill:hover { background: rgba(91,122,149,0.12); color: var(--glacier); }
   .pill.active { border-color: var(--ice-mist); color: var(--ice-mist); background: rgba(91,122,149,0.16); }
 
-  /* social links grid */
-  .links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hair); border-top: 1px solid var(--hair); }
+  /* social links grid — 2 columns × 3 rows keeps the panel tall/portrait */
+  .links { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--hair); border-top: 1px solid var(--hair); }
   .link {
     background: rgba(12,17,24,0.55); padding: 18px 12px;
     display: flex; flex-direction: column; align-items: center; gap: 9px;
@@ -198,12 +380,12 @@
   @media (max-width: 520px) {
     .rail, .foot { font-size: 8px; letter-spacing: 0.14em; padding-left: 16px; padding-right: 16px; }
     .hub { padding: 56px 14px; gap: 0; }
-    .module { width: 100%; max-width: 380px; }
-    .mod-header { padding: 18px 14px 15px; gap: 9px; }
+    .module { width: 100%; max-width: 300px; }       /* keep the panel narrow/vertical on mobile */
+    .mod-header { padding: 24px 16px 15px; gap: 9px; }  /* extra top room for the hud-deco hatch/id */
     .hub-wm { width: min(210px, 56vw); }
     .player { padding: 12px; gap: 10px; }
     .tracks { padding: 0 12px 12px; }
-    .links { grid-template-columns: repeat(3, 1fr); }   /* 3×2 is shorter than 2×3 */
+    .links { grid-template-columns: repeat(2, 1fr); }   /* 2×3 keeps it portrait */
     .link { padding: 14px 6px; gap: 7px; }
     .link .l-v { font-size: 11px; }
   }
@@ -224,6 +406,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     #boot-logo, .blip, .hub-type .cur { animation: none !important; }
+    #boot-lines .ln { animation: none !important; opacity: 1 !important; }
   }
 </style>
 </head>
@@ -232,14 +415,28 @@
   <div id="vignette"></div>
   <div id="grain"></div>
 
-  <!-- ════ BOOT ════ -->
+  <!-- ════ BOOT — content "initializing": the real relic (wispies.glb) loads in as wireframe behind a console + the menu skeleton, then a white flash reveals the live UI ════ -->
+  <!-- the 3D shape itself is the WebGL relic showing through the fading boot veil — driven via window.__relicMode() -->
   <div id="boot">
     <div id="boot-logo"></div>
-    <div id="boot-console">
-      <div id="boot-lines"></div>
-      <div id="boot-bar-wrap"><div id="boot-bar"></div></div>
+    <div id="skel-module">
+      <div id="skel-build">
+        <div class="sk-brk tl"></div><div class="sk-brk tr"></div><div class="sk-brk bl"></div><div class="sk-brk br"></div>
+        <div class="sk sk-line" style="top:26%"></div>
+        <div class="sk sk-line" style="top:33%"></div>
+        <div class="sk sk-box sk-player"><span class="sk-sq"></span><span class="sk-cross"></span></div>
+        <div class="sk sk-tracks"><span></span><span></span><span></span></div>
+        <div class="sk-grid"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div id="scanline"></div>
     </div>
+    <!-- installer-style overlays (dialogs / abstract panels / big status text) are spawned into here by the boot script -->
+    <div id="boot-fx"></div>
+    <!-- boot console — narrates the actual assets being generated/loaded -->
+    <div id="boot-console"><div id="boot-lines"></div></div>
   </div>
+  <div id="relic-scan"></div>
+  <div id="boot-flash"></div>
 
   <!-- ════ STAGE ════ -->
   <main id="stage">
@@ -249,9 +446,10 @@
     </div>
 
     <div class="hub">
+      <!-- TODO(voltra): restyle this panel to be more "voltra"-inspired (the original reference) — follow-up pass after the boot rework -->
       <div class="module" id="module">
+        <div class="hud-deco" aria-hidden="true"><span class="hatch"></span><span class="hid">BC·444</span><span class="plus b">+</span><span class="plus r">+</span></div>
         <div class="mod-header">
-          <div class="mod-kicker">&#9670; HEAVENLINK CONSOLE</div>
           <img class="hub-wm" id="h-wm" src="wordmark.png" alt="FOUR FOUR FOUR">
           <div class="hub-type"><span id="typewriter"></span><span class="cur">&#9608;</span></div>
         </div>
@@ -323,8 +521,9 @@
     grad.addColorStop(0.0, '#22324c'); grad.addColorStop(0.42, '#1A2332'); grad.addColorStop(1.0, '#080b11');
     g.fillStyle = grad; g.fillRect(0, 0, 4, 512);
     const bgTex = new THREE.CanvasTexture(bg); bgTex.colorSpace = THREE.SRGBColorSpace;
-    scene.background = bgTex;
-    scene.fog = new THREE.FogExp2(0x0b0f16, 0.045);
+    const blackBg = new THREE.Color(0x000000);      // intro background = pure black; the gradient returns at the chrome reveal
+    scene.background = blackBg;
+    scene.fog = new THREE.FogExp2(0x000000, 0.045);  // fade distant wireframe to black during the intro (restored to slate on reveal)
 
     const RELIC_R = 11.0;                  // model normalized to this bounding radius
     const CAM_Z = 0.4;                     // camera sits INSIDE, pinned on the spin axis (Z), close to centre
@@ -362,12 +561,71 @@
     });
     const relic = new THREE.Group();
     scene.add(relic);
+
+    // ── render-mode plumbing: the boot "loads in" a HEAVILY DECIMATED wireframe (cheap), then resolves to full-fidelity chrome ──
+    // The intro also bypasses the heavy composer (see tick) — wireframe renders straight to screen, no bloom/DoF/MSAA.
+    const relicWireObjs = [];
+    // wireframe CONSTRUCTS from the centre outward: a custom shader discards edges beyond a growing radius (uReveal),
+    // with a glowing leading edge — so it reads as being built in 3D, not faded in. Decimated geo keeps it cheap.
+    const WIRE_BASE = 0.46, DECIMATE = 9;
+    const relicWireMat = new THREE.ShaderMaterial({
+      transparent: true, wireframe: true, side: THREE.DoubleSide, depthWrite: false,
+      uniforms: { uReveal: { value: 0 }, uOpacity: { value: 0 }, uColor: { value: new THREE.Color(0xAAB0B5) } },
+      vertexShader: 'varying float vR; void main(){ vR = length(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader:
+        'uniform float uReveal; uniform float uOpacity; uniform vec3 uColor; varying float vR;\n' +
+        'void main(){\n' +
+        '  if (vR > uReveal) discard;\n' +
+        '  float edge = smoothstep(uReveal*0.8, uReveal, vR);\n' +        // glowing leading edge at the construction frontier
+        '  gl_FragColor = vec4(uColor*(0.72+0.9*edge), uOpacity*(0.55+0.45*edge));\n' +
+        '}'
+    });
+    let relicMode = 'off', wWire = 0, appliedMode = null, relicMax = 12;  // 'off' until the late build, then 'wire' → 'solid'
+    window.__relicMode = (m) => { relicMode = m; };
+    // build a low-poly index by keeping every Nth triangle; shares the position buffer (no copy → no load hang)
+    function decimateGeo(geo, stride) {
+      const pos = geo.attributes.position;
+      const triCount = Math.floor((geo.index ? geo.index.count : pos.count) / 3);
+      const src = geo.index ? geo.index.array : null, keep = [];
+      for (let t = 0; t < triCount; t += stride) {
+        const b = t * 3;
+        if (src) keep.push(src[b], src[b + 1], src[b + 2]); else keep.push(b, b + 1, b + 2);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', pos);
+      g.setIndex(keep);
+      return g;
+    }
+    function updateRelic(dt) {
+      const solid = (relicMode === 'solid');
+      wWire += (((relicMode === 'wire') ? 1 : 0) - wWire) * Math.min(1, dt * 0.95);  // ~1.6s outward build
+      relicWireMat.uniforms.uReveal.value = wWire * relicMax * 1.05;                  // grow the reveal radius from the centre
+      relicWireMat.uniforms.uOpacity.value = WIRE_BASE;
+      if (appliedMode !== relicMode) {               // toggle only on an actual mode change
+        appliedMode = relicMode;
+        mat.visible = solid;                         // full chrome surface only once resolved
+        relicWireObjs.forEach(w => w.visible = (relicMode === 'wire'));
+        scene.background = solid ? bgTex : blackBg;  // black during the intro; slate gradient on reveal
+        scene.fog.color.setHex(solid ? 0x0b0f16 : 0x000000);
+      }
+    }
+
     new GLTFLoader().load('wispies.glb', (gltf) => {
-      gltf.scene.traverse((o) => { if (o.isMesh) o.material = mat; });
+      // collect first — adding a Mesh child INSIDE traverse() would make traverse re-visit it forever (stack overflow)
+      const meshes = [];
+      gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
       // GLB is already centroid-centered; just normalize scale (no re-shift, or we'd undo the centering)
       const sph = new THREE.Box3().setFromObject(gltf.scene).getBoundingSphere(new THREE.Sphere());
+      relicMax = sph.radius;                         // local-space radius — matches length(position) in the shader
+      meshes.forEach((o) => {
+        o.material = mat;                            // full-fidelity chrome (shown at the end)
+        const wireMesh = new THREE.Mesh(decimateGeo(o.geometry, DECIMATE), relicWireMat);
+        o.add(wireMesh); relicWireObjs.push(wireMesh);   // decimated wireframe child (shares the mesh transform)
+      });
       gltf.scene.scale.setScalar(RELIC_R / sph.radius);
       relic.add(gltf.scene);
+      mat.visible = false;                           // hidden until the boot resolves to 'solid'
+      window.__relicReady = true;
     });
 
     // soft circular sprite so floaters are round dots, not square pixels
@@ -450,6 +708,7 @@
       // roll the shape about Z — the camera is ON the Z axis, so every point's distance to it is
       // invariant under this rotation: the geometry can sweep around but never reach the camera
       if (!reduce) relic.rotation.z += dt * 0.08;
+      updateRelic(dt);                              // boot render-mode: decimated wireframe → solid chrome
 
       motes.rotation.y += dt * 0.01;
       motes.position.y = (t * 0.06) % 4;
@@ -459,7 +718,9 @@
       camera.position.set(0, 0, CAM_Z);
       camera.lookAt(cur.x * 0.022, -cur.y * 0.018, 0);
 
-      composer.render();
+      // intro renders straight to screen (cheap, no bloom/DoF/MSAA → fast + crisp wireframe);
+      // the full composer kicks in only once the relic resolves to chrome (under the white flash)
+      if (relicMode === 'solid') composer.render(); else renderer.render(scene, camera);
     }
     tick();
     window.__glReady = true;
@@ -470,36 +731,48 @@
   (function () {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    /* ── shortened boot (≈ half the original) ── */
+    /* ── intro: content "initializing" — the real relic loads in (wireframe) behind a console + the menu building, then a white flash reveals the live UI ── */
     const boot = document.getElementById('boot');
     const bootLogo = document.getElementById('boot-logo');
+    const stageEl = document.getElementById('stage');
+    const skelModule = document.getElementById('skel-module');
+    const skelBuild = document.getElementById('skel-build');
+    const skelGrid = skelModule.querySelector('.sk-grid');
+    const scanline = document.getElementById('scanline');
+    const bootConsole = document.getElementById('boot-console');
     const bootLines = document.getElementById('boot-lines');
-    const barWrap = document.getElementById('boot-bar-wrap');
-    const bar = document.getElementById('boot-bar');
-    const stage = document.getElementById('stage');
+    const fxLayer = document.getElementById('boot-fx');
+    const relicScan = document.getElementById('relic-scan');
+    const flash = document.getElementById('boot-flash');
 
-    /* pin the intro logo onto the loaded wordmark's exact rect so it never jumps on the handoff */
+    /* measure the module's FINAL (revealed) geometry so the skeleton & logo line up with — and never jump to — the real UI */
     const wmImg = document.getElementById('h-wm');
     const moduleEl = document.getElementById('module');
-    function placeBootLogo() {
+    function withFinalRect(read) {
       const prev = moduleEl.style.transform;
-      moduleEl.style.transform = 'none';          // measure the module's FINAL (revealed) position, not the slid-down one
-      const r = wmImg.getBoundingClientRect();
+      moduleEl.style.transform = 'none';
+      const r = read();
       moduleEl.style.transform = prev;
+      return r;
+    }
+    function placeBootLogo() {
+      const r = withFinalRect(() => wmImg.getBoundingClientRect());
       if (!r.width || !r.height) return;
       bootLogo.style.transform = 'none';
-      bootLogo.style.left = r.left + 'px';
-      bootLogo.style.top = r.top + 'px';
-      bootLogo.style.width = r.width + 'px';
-      bootLogo.style.height = r.height + 'px';
+      bootLogo.style.left = r.left + 'px'; bootLogo.style.top = r.top + 'px';
+      bootLogo.style.width = r.width + 'px'; bootLogo.style.height = r.height + 'px';
     }
-    if (wmImg.complete) placeBootLogo(); else wmImg.addEventListener('load', placeBootLogo);
-    window.addEventListener('resize', placeBootLogo);
+    function placeSkelModule() {
+      const r = withFinalRect(() => moduleEl.getBoundingClientRect());
+      if (!r.width || !r.height) return;
+      skelModule.style.left = r.left + 'px'; skelModule.style.top = r.top + 'px';
+      skelModule.style.width = r.width + 'px'; skelModule.style.height = r.height + 'px';
+    }
+    function placeAll() { placeBootLogo(); placeSkelModule(); }
+    if (wmImg.complete) placeAll(); else wmImg.addEventListener('load', placeAll);
+    window.addEventListener('resize', placeAll);
 
-    const MAXLN = 26;                              // keep the console DOM bounded
-    const rng  = (a, b) => a + Math.random() * (b - a);
-    const pick = a => a[Math.floor(Math.random() * a.length)];
-    const hex  = n => { let s = ''; for (let i = 0; i < n; i++) s += '0123456789abcdef'[Math.floor(Math.random()*16)]; return s; };
+    const MAXLN = 22;                               // keep the console DOM bounded
     function emit(text, cls) {
       const div = document.createElement('div');
       div.className = 'ln' + (cls ? ' ' + cls : '');
@@ -507,71 +780,198 @@
       bootLines.appendChild(div);
       while (bootLines.children.length > MAXLN) bootLines.removeChild(bootLines.firstChild);
     }
+    // drive the real WebGL relic's render mode ('points' | 'wire' | 'solid'); no-op if WebGL is unavailable
+    const relicMode = (m) => { if (window.__relicMode) window.__relicMode(m); };
+    // fade the boot's black veil so the WebGL relic shows through behind everything (a = veil opacity, 1 → 0)
+    function fadeVeil(a) { boot.style.background = 'rgba(0,0,0,' + a + ')'; }
 
-    /* ── Phase 1 — the paced HEAVENLINK boot (typed, the part he loves) ── */
-    const headLines = [
-      '// INITIALIZING HEAVENLINK SYSTEM',
-      '// LOADING AUDIO MATRIX',
-      '// ESTABLISHING UPLINK',
-      '// SYNCING TRANSMISSION RELAY',
-      '// CALIBRATING SIGNAL INTEGRITY',
-    ];
-    function typeHead(i, done) {
-      if (i >= headLines.length) { done(); return; }
-      const div = document.createElement('div'); div.className = 'ln head'; bootLines.appendChild(div);
-      const text = headLines[i]; let c = 0;
-      (function ch() {
-        if (c < text.length) { div.textContent += text[c++]; setTimeout(ch, reduce ? 4 : rng(16, 30)); }
-        else { bar.style.width = Math.round((i + 1) / headLines.length * 52) + '%';
-               setTimeout(() => typeHead(i + 1, done), reduce ? 40 : rng(150, 300)); }
-      })();
-    }
+    /* ── "initializing" overlays: abstract panels, installer dialogs, big status text & chaotic flash-blocks ── */
+    const fxAll = [], fxIvals = [];
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const hx = n => { let s = ''; for (let i = 0; i < n; i++) s += '0123456789abcdef'[Math.floor(Math.random() * 16)]; return s; };
+    function fxEl(cls) { const d = document.createElement('div'); d.className = cls; fxLayer.appendChild(d); fxAll.push(d); return d; }
+    function track(iv) { fxIvals.push(iv); return iv; }
+    // ~half the panels "power on" squished-then-full before rendering contents; the rest just scan in
+    function appear(el) { requestAnimationFrame(() => el.classList.add(Math.random() < 0.5 ? 'boot' : 'in')); }
+    function dismiss(el, iv) { if (iv) clearInterval(iv); el.classList.remove('in', 'boot'); el.classList.add('out'); setTimeout(() => el.remove(), 420); }
 
-    /* ── Phase 2 — the flood: a torrent of console lines, piling up faster and faster ── */
-    const MODS  = ['seraph','halo','vox','relay','choir','aether','cipher','beacon','psalm','umbra','oracle','matrix','signal','ascension'];
-    const VERBS = ['mount','link','verify','cache','stream','decode','bind','sync','flush','probe','align','spool','resolve'];
-    function floodLine() {
-      switch (Math.floor(Math.random() * 6)) {
-        case 0:  return [`[OK] ${pick(MODS)}.node 0x${hex(4)} registered`, 'ok'];
-        case 1:  return [`>> ${pick(VERBS)} /heaven/${pick(MODS)}/${hex(2)} ... ${pick(['ok','done','204b','512b','1.2k'])}`, 'sys'];
-        case 2:  return [`chk ${hex(8)} :: ${pick(['verified','passed','sealed'])}`, 'sys'];
-        case 3:  return [`relay ${hex(3)}>${hex(3)} | ${Math.floor(rng(8,72))}ms`, 'sys'];
-        case 4:  return [`audio.buffer ${pick(['44.1','48.0'])}khz / ${pick(['256','512','1024'])} ${pick(['ok','locked'])}`, 'sys'];
-        default: return [`:: ${pick(MODS)} ascension +${Math.floor(rng(100,999))}`, 'sys'];
-      }
+    // small HUD readout — a SCROLLING telemetry histogram (solid bars, values shift left over time)
+    function spawnRect(label, x, y, w, h, life) {
+      const r = fxEl('fx-rect');
+      r.style.cssText += `left:${x};top:${y};width:${w};height:${h}`;
+      r.innerHTML = '<span class="lbl">' + label + '</span><span class="bars">' + '<i></i>'.repeat(11) + '</span>';
+      const bi = [].slice.call(r.querySelectorAll('.bars i'));
+      const setH = el => { el.style.height = Math.round(rnd(14, 92)) + '%'; };
+      bi.forEach(setH);
+      const iv = track(setInterval(() => {                 // scroll: shift heights left, new sample at the right
+        for (let k = 0; k < bi.length - 1; k++) bi[k].style.height = bi[k + 1].style.height;
+        setH(bi[bi.length - 1]);
+      }, 320));
+      appear(r);
+      if (life) setTimeout(() => dismiss(r, iv), life);
+      return r;
     }
-    function flood(done) {
-      let n = 0; const total = reduce ? 10 : 80;
-      (function step() {
-        const burst = 1 + Math.floor(n / 22);                 // accelerate — more lines per tick over time
-        for (let k = 0; k < burst && n < total; k++) { const [t, c] = floodLine(); emit(t, c); n++; }
-        bar.style.width = Math.round(52 + (n / total) * 48) + '%';
-        if (n < total) setTimeout(step, reduce ? 30 : Math.max(8, 26 - n * 0.22));
-        else done();
-      })();
+    // small HUD readout — a FLOODING console (fast hex log lines streaming up)
+    function spawnConsole(label, x, y, w, h, life) {
+      const r = fxEl('fx-rect');
+      r.style.cssText += `left:${x};top:${y};width:${w};height:${h}`;
+      r.innerHTML = '<span class="lbl">' + label + '</span><div class="con"></div>';
+      const con = r.querySelector('.con');
+      const verbs = ['rd', 'wr', 'map', 'chk', 'rx', 'tx', 'ld', 'mv', 'cmp'];
+      const iv = track(setInterval(() => {
+        const d = document.createElement('div');
+        if (Math.random() < 0.16) { d.textContent = '[ok] 0x' + hx(4) + ' sealed'; d.className = 'ok'; }
+        else d.textContent = '0x' + hx(4) + ' ' + verbs[Math.floor(Math.random() * verbs.length)] + ' ' + hx(2) + '·' + hx(2) + ' ' + Math.floor(rnd(8, 99)) + 'b';
+        con.appendChild(d);
+        while (con.children.length > 16) con.removeChild(con.firstChild);
+      }, 75));                                              // floods fast
+      appear(r);
+      if (life) setTimeout(() => dismiss(r, iv), life);
+      return r;
     }
+    // a single boot flash-block at a deliberate (xv,yv) vw/vh slot — flickers in, holds, flickers out
+    function flashBlock(xv, yv) {
+      const b = fxEl('fx-blk'); const t = Math.random(); let w, h;
+      if (t < 0.30)      { w = rnd(34, 150); h = rnd(1, 3); }      // thin bar / line
+      else if (t < 0.55) { w = rnd(7, 20);  h = rnd(7, 20); }      // small square
+      else               { w = rnd(26, 130); h = rnd(12, 60); }    // block
+      const solid = Math.random() < 0.55, dur = rnd(0.5, 0.9);
+      b.style.cssText += `left:${xv}vw;top:${yv}vh;width:${w}px;height:${h}px;--d:${dur}s;`
+        + (solid ? 'background:#e3eaf1;' : 'background:rgba(150,170,190,0.1);border:1px solid var(--hair-bright);');
+      setTimeout(() => b.remove(), dur * 1000 + 90);
+    }
+    // programmatic "boot beat" — steps a flicker-block down alternating sides (deliberate, not a random storm)
+    let blkI = 0;
+    function blkBeat() {
+      const right = blkI % 2, row = Math.floor(blkI / 2);
+      flashBlock(right ? rnd(64, 82) : rnd(4, 18), 9 + row * 13 + rnd(-3, 3));
+      blkI++;
+    }
+    // installer-style dialog: title bar + message + progress bar that fills, then "done" and dismiss
+    function spawnDialog(label, msg, x, y, fillMs, holdMs) {
+      const d = fxEl('fx-dlg'); d.style.cssText += `left:${x};top:${y}`;
+      const bar = document.createElement('div'); bar.className = 'fx-dlg-bar';
+      const lab = document.createElement('span'); lab.textContent = label;
+      const dots = document.createElement('span'); dots.className = 'dots'; dots.textContent = '— ▫ ✕';
+      bar.appendChild(lab); bar.appendChild(dots);
+      const body = document.createElement('div'); body.className = 'fx-dlg-body';
+      const m = document.createElement('div'); m.className = 'fx-dlg-msg'; m.textContent = msg;
+      const prog = document.createElement('div'); prog.className = 'fx-prog';
+      const fill = document.createElement('i'); prog.appendChild(fill);
+      body.appendChild(m); body.appendChild(prog); d.appendChild(bar); d.appendChild(body);
+      appear(d);
+      setTimeout(() => { fill.style.transition = `width ${fillMs}ms ease-in-out`; fill.style.width = '100%'; }, 540);
+      setTimeout(() => { m.textContent = '✓ ' + label.toLowerCase() + ' ok'; m.classList.add('ok'); }, fillMs + 640);
+      setTimeout(() => dismiss(d), fillMs + (holdMs || 700) + 400);
+      return d;
+    }
+    // big status text flash (rotated vertical, positioned by CSS)
+    function bigText(text, size) {
+      const b = fxEl('fx-big'); b.textContent = text; b.style.fontSize = size;
+      requestAnimationFrame(() => b.classList.add('in'));
+      setTimeout(() => b.remove(), 1750);
+    }
+    // quick full-screen flash for punch
+    function flick(a, ms) {
+      const f = document.createElement('div');
+      f.style.cssText = 'position:fixed;inset:0;z-index:7;pointer-events:none;background:#c9d6e2;opacity:' + a + ';transition:opacity ' + ms + 'ms ease';
+      fxLayer.appendChild(f);
+      requestAnimationFrame(() => { f.style.opacity = '0'; });
+      setTimeout(() => f.remove(), ms + 60);
+    }
+    function fxClearAll() { fxIvals.forEach(clearInterval); fxAll.forEach(e => { e.classList.add('out'); setTimeout(() => e.remove(), 420); }); }
 
-    /* ── Phase 3 — calm: the storm settles into the secured state ── */
-    function calm(done) {
-      bar.style.width = '100%';
-      setTimeout(() => { emit('', ''); emit('// CONNECTION SECURED', 'secured'); }, 280);
-      setTimeout(() => emit('// WELCOME', 'secured'), 760);
-      setTimeout(done, reduce ? 500 : 1350);
-    }
-
-    function finishBoot() {
-      placeBootLogo();                            // re-pin to the exact final rect right before the handoff
-      boot.classList.add('gone'); stage.classList.add('in'); startHub();
-      setTimeout(() => boot.remove(), 800);
-    }
-    function runBoot() {
-      placeBootLogo();
-      bootLogo.style.transition = 'opacity 0.45s'; bootLogo.style.opacity = '1';
+    /* "render complete" — quick flash to white; resolve the wireframe to the solid chrome relic, then a slow ~2s fade onto the live UI */
+    function startWhiteFlash() {
+      placeAll();                                   // re-pin right before the handoff
+      flash.style.transition = 'opacity 0.15s ease-out';
+      flash.style.opacity = '1';
       setTimeout(() => {
-        bootLines.style.transition = barWrap.style.transition = 'opacity 0.3s';
-        bootLines.style.opacity = barWrap.style.opacity = '1';
-        typeHead(0, () => flood(() => calm(finishBoot)));
-      }, reduce ? 120 : 520);
+        relicMode('solid');                         // resolve to the real chrome shape (swap hidden beneath the white)
+        stageEl.classList.add('live'); startHub();  // reveal the real content beneath the white
+        boot.classList.add('gone');
+        setTimeout(() => boot.remove(), 400);
+        flash.style.transition = 'opacity 2s ease-in';
+        flash.style.opacity = '0';
+        setTimeout(() => flash.remove(), 2100);
+      }, 160);
+    }
+
+    function runBoot() {
+      placeAll();
+
+      if (reduce) {                                 // calm path: no strobe, no white flash — resolve + fade in
+        relicMode('solid'); fadeVeil(0.3);
+        bootLogo.style.transition = 'opacity 0.4s'; bootLogo.style.opacity = '1';
+        skelModule.style.opacity = '1';
+        skelBuild.style.clipPath = 'inset(0 0 0% 0)'; skelBuild.style.webkitClipPath = 'inset(0 0 0% 0)';
+        bootConsole.style.opacity = '1';
+        emit('// 444 runtime — cold boot', 'head'); emit('interface composed', 'ok'); emit('// READY', 'secured');
+        setTimeout(() => { stageEl.classList.add('live'); boot.classList.add('gone'); startHub(); setTimeout(() => boot.remove(), 700); }, 1400);
+        return;
+      }
+
+      const at = (ms, fn) => setTimeout(fn, ms);
+      const wide = window.innerWidth > 820;          // wide screens scatter extra dialogs/panels; mobile keeps the core
+
+      // boot beats — flicker-blocks step in on a steady programmatic cadence (one at a time, not a random storm)
+      const beatIv = track(setInterval(blkBeat, 370));
+      at(5000, () => clearInterval(beatIv));
+
+      // 0.0 — black; console wakes; vertical status text powers on at the left edge
+      bootConsole.style.transition = 'opacity 0.5s';
+      at(40,  () => { bootConsole.style.opacity = '1'; });
+      at(60,  () => emit('// 444 runtime — cold boot', 'head'));
+      at(180, () => { bigText('INITIALIZING', 'clamp(15px,2.4vh,26px)'); flick(0.18, 260); });
+
+      // the system "installs" fast — dialogs, a flooding console & a telemetry histogram scan in, overlapping; varied sizes
+      at(420,  () => { spawnDialog('MOUNT', 'mounting core assets', '7%', '5%', 1100, 500); flick(0.12, 180); });
+      if (wide) {
+        at(760,  () => spawnConsole('PROC // 0x44', '69%', '11%', '212px', '126px', 4800));
+        at(1050, () => spawnRect('SYS.04 // BUF', '5%', '22%', '150px', '96px', 4400));
+        at(1550, () => spawnDialog('AUDIO', 'loading audio matrix', '6%', '54%', 1300, 700));
+        at(2000, () => spawnRect('MEM // ALLOC', '72%', '60%', '188px', '84px', 3800));
+        at(2550, () => spawnDialog('RELAY', 'opening relay', '64%', '42%', 1500, 900));
+        at(3300, () => spawnDialog('NODES', 'linking nodes', '5%', '70%', 1300, 1100));
+      } else {                                        // mobile reuses the top slot: MOUNT → flooding console → AUDIO
+        at(1850, () => spawnConsole('PROC // 0x44', '7%', '5%', '84vw', '116px', 2500));
+        at(4700, () => spawnDialog('AUDIO', 'loading audio matrix', '7%', '5%', 1200, 600));
+      }
+      at(700,  () => emit('probe gpu :: webgl2 · ok', 'sys'));
+      at(1000, () => emit('mount /core ... ok', 'sys'));
+      at(1350, () => emit('audio.buffer 48.0khz / 512 locked', 'sys'));
+
+      // 1.3 — logo scans in
+      at(1300, () => emit('load wordmark.png', 'sys'));
+      at(1400, () => { bootLogo.style.transition = 'opacity 0.7s ease'; bootLogo.style.opacity = '0.92'; });
+      at(1600, () => emit('wordmark.png ... ok', 'ok'));
+
+      // 1.95 — status flash, then THE FOCUS: the menu UI is created (skeleton fades in, draws downward behind the scanline)
+      at(1950, () => { bigText('COMPOSING INTERFACE', 'clamp(13px,2vh,22px)'); flick(0.12, 180); });
+      at(2300, () => { emit('compose interface // transmissions', 'head'); skelModule.style.opacity = '1'; flick(0.1, 160); });
+      at(2600, () => {
+        scanline.style.opacity = '1';
+        const BUILD = 2900;
+        skelBuild.style.transition = 'clip-path ' + BUILD + 'ms ease-in-out, -webkit-clip-path ' + BUILD + 'ms ease-in-out';
+        scanline.style.transition = 'top ' + BUILD + 'ms ease-in-out';
+        skelBuild.style.clipPath = 'inset(0 0 0% 0)'; skelBuild.style.webkitClipPath = 'inset(0 0 0% 0)';
+        scanline.style.top = '100%';
+      });
+      at(3100, () => emit('mount player :: 444-enigma-demo.m4a', 'sys'));
+      at(3600, () => emit('queue :: fadeaway-demo · nrg-demo', 'sys'));
+      at(4100, () => emit('link nodes :: instagram soundcloud spotify', 'sys'));
+      at(4600, () => emit('link nodes :: apple-music patreon mail', 'sys'));
+      at(5100, () => emit('draw grid 2×3 ... ok', 'ok'));
+      at(5400, () => { scanline.style.transition = 'opacity 0.4s'; scanline.style.opacity = '0'; skelGrid.classList.add('lit'); emit('interface composed', 'ok'); });
+
+      // 6.0 — LAST: the wireframe relic CONSTRUCTS from the centre outward (shader radial build), subtle, behind everything
+      at(6000, () => bigText('CONSTRUCTING GEOMETRY', 'clamp(12px,1.9vh,20px)'));
+      at(6150, () => { emit('construct geometry :: wispies.glb', 'sys'); boot.style.transition = 'background-color 1.8s ease'; fadeVeil(0.34); relicMode('wire'); });
+      at(7300, () => emit('signal integrity ... 100%', 'ok'));
+
+      // 7.7 — clear the installer overlays, final status, then white flash → live UI
+      at(7700, () => { fxClearAll(); emit('// RENDER COMPLETE', 'secured'); bigText('444', 'clamp(20px,3vh,40px)'); flick(0.2, 280); });
+      at(8400, startWhiteFlash);
     }
     setTimeout(runBoot, 250);
 
