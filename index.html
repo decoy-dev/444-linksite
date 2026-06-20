@@ -76,11 +76,12 @@
     background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(4,7,12,0.5) 2px 3px);
   }
 
-  /* the intro logo (masked wordmark) — strobes in, pinned (in JS) to the final wordmark rect so it never jumps */
+  /* the intro logo — a hollow vector OUTLINE of the wordmark that BUILDS OUT from the centre during the render,
+     pinned (in JS) to the final wordmark rect so it never jumps; the live filled hub wordmark takes over at the white flash */
   #boot-logo {
-    position: fixed; left: 50%; top: 38%; transform: translateX(-50%); width: 250px; height: 61px; background: var(--glacier);
-    -webkit-mask: var(--wm) center / contain no-repeat; mask: var(--wm) center / contain no-repeat;
-    opacity: 0; filter: drop-shadow(0 0 18px rgba(91,122,149,0.55)); z-index: 3;
+    position: fixed; left: 50%; top: 38%; transform: translateX(-50%); width: 250px; height: 61px; object-fit: contain;
+    opacity: 0; filter: drop-shadow(0 0 14px rgba(120,160,190,0.6)); z-index: 3;
+    clip-path: inset(0 50% 0 50%); -webkit-clip-path: inset(0 50% 0 50%);   /* starts collapsed at the centre; opens outward as it builds */
   }
 
   /* content-module skeleton — pinned (in JS) to the final module rect, then builds top→down behind a scanline */
@@ -317,14 +318,6 @@
     background: linear-gradient(90deg, transparent, rgba(232,240,250,0.9), transparent);
   }
   .module > * { position: relative; z-index: 2; }
-  /* HUD detailing: corner hatch + id label + cross-ticks */
-  .hud-deco { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-  .hud-deco .hatch { position: absolute; top: 7px; left: 16px; width: 44px; height: 7px;
-    background: repeating-linear-gradient(125deg, var(--ice-mist) 0 2px, transparent 2px 5px); opacity: 0.7; }
-  .hud-deco .hid { position: absolute; top: 5px; right: 42px; font-family: var(--mono); font-size: 7.5px;
-    letter-spacing: 0.22em; color: var(--ice-mist); opacity: 0.65; }
-  .hud-deco .plus { position: absolute; font-family: var(--mono); font-size: 11px; color: var(--ice-mist); opacity: 0.5; }
-  .hud-deco .plus.b { left: 9px; bottom: 36px; } .hud-deco .plus.r { right: 9px; top: 40%; }
   .mod-label {
     display: flex; align-items: center; justify-content: space-between;
     padding: 11px 14px; border-bottom: 1px solid var(--hair);
@@ -414,7 +407,7 @@
     .rail, .foot { font-size: 8px; letter-spacing: 0.14em; padding-left: 16px; padding-right: 16px; }
     .hub { padding: 56px 14px; gap: 0; }
     .module { width: 100%; max-width: 300px; }       /* keep the panel narrow/vertical on mobile */
-    .mod-header { padding: 24px 16px 15px; gap: 9px; }  /* extra top room for the hud-deco hatch/id */
+    .mod-header { padding: 24px 16px 15px; gap: 9px; }
     .hub-wm { width: min(210px, 56vw); }
     .player { padding: 12px; gap: 10px; }
     .tracks { padding: 0 12px 12px; }
@@ -451,7 +444,8 @@
   <!-- ════ BOOT — content "initializing": the real relic (wispies.glb) loads in as wireframe behind a console + the menu skeleton, then a white flash reveals the live UI ════ -->
   <!-- the 3D shape itself is the WebGL relic showing through the fading boot veil — driven via window.__relicMode() -->
   <div id="boot">
-    <div id="boot-logo"></div>
+    <!-- intro logo: a stroke-only, hollow-interior vector outline of the wordmark (traced from wordmark.png) -->
+    <img id="boot-logo" src="wordmark-outline.svg" alt="" aria-hidden="true">
     <div id="skel-module">
       <div id="skel-build">
         <div class="sk-brk tl"></div><div class="sk-brk tr"></div><div class="sk-brk bl"></div><div class="sk-brk br"></div>
@@ -481,7 +475,6 @@
     <div class="hub">
       <!-- TODO(voltra): restyle this panel to be more "voltra"-inspired (the original reference) — follow-up pass after the boot rework -->
       <div class="module" id="module">
-        <div class="hud-deco" aria-hidden="true"><span class="hatch"></span><span class="hid">BC·444</span><span class="plus b">+</span><span class="plus r">+</span></div>
         <div class="mod-header">
           <img class="hub-wm" id="h-wm" src="wordmark.png" alt="FOUR FOUR FOUR">
           <div class="hub-type"><span id="typewriter"></span><span class="cur">&#9608;</span></div>
@@ -939,7 +932,8 @@
 
       if (reduce) {                                 // calm path: no strobe, no white flash — resolve + fade in
         relicMode('solid'); fadeVeil(0.3);
-        bootLogo.style.transition = 'opacity 0.4s'; bootLogo.style.opacity = '1';
+        bootLogo.style.transition = 'opacity 0.4s'; bootLogo.style.opacity = '0.56';
+        bootLogo.style.clipPath = 'inset(0 0 0 0)'; bootLogo.style.webkitClipPath = 'inset(0 0 0 0)';   // no build — just show it
         skelModule.style.opacity = '1';
         skelBuild.style.clipPath = 'inset(0 0 0% 0)'; skelBuild.style.webkitClipPath = 'inset(0 0 0% 0)';
         bootConsole.style.opacity = '1';
@@ -978,9 +972,15 @@
       at(1000, () => emit('mount /core ... ok', 'sys'));
       at(1350, () => emit('audio.buffer 48.0khz / 512 locked', 'sys'));
 
-      // 1.3 — logo scans in
+      // 1.3 — logo BUILDS OUT from the centre (clip reveal opens outward + a bright leading edge that settles)
       at(1300, () => emit('load wordmark.png', 'sys'));
-      at(1400, () => { bootLogo.style.transition = 'opacity 0.7s ease'; bootLogo.style.opacity = '0.92'; });
+      at(1400, () => {
+        bootLogo.style.transition = 'opacity 0.5s ease, clip-path 0.95s cubic-bezier(.2,.7,.2,1), -webkit-clip-path 0.95s cubic-bezier(.2,.7,.2,1)';
+        bootLogo.style.filter = 'drop-shadow(0 0 22px rgba(120,160,190,0.85)) brightness(1.5)';   // bright leading edge while it draws
+        bootLogo.style.opacity = '0.62';
+        bootLogo.style.clipPath = 'inset(0 0 0 0)'; bootLogo.style.webkitClipPath = 'inset(0 0 0 0)';
+      });
+      at(1900, () => { bootLogo.style.opacity = '0.56'; bootLogo.style.filter = 'drop-shadow(0 0 14px rgba(120,160,190,0.6))'; });   // settle to a calmer, dimmer outlined mark
       at(1600, () => emit('wordmark.png ... ok', 'ok'));
 
       // 1.95 — status flash, then THE FOCUS: the menu UI is created (skeleton fades in, draws downward behind the scanline)
@@ -1007,7 +1007,7 @@
       at(7300, () => emit('signal integrity ... 100%', 'ok'));
 
       // 7.7 — clear the installer overlays, final status, then white flash → live UI
-      at(7700, () => { fxClearAll(); emit('// RENDER COMPLETE', 'secured'); bigText('444', 'clamp(20px,3vh,40px)'); flick(0.2, 280); });
+      at(7700, () => { fxClearAll(); emit('// RENDER COMPLETE', 'secured'); bigText('444', 'clamp(20px,3vh,40px)'); });
       at(8400, startWhiteFlash);
     }
     setTimeout(runBoot, 250);
