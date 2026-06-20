@@ -32,6 +32,7 @@ done under a different account, so make sure `gh`/git is authed as `decoy-dev`.)
 | `index.html` | The entire site — HTML, CSS, and 3 inline `<script>` blocks |
 | `wispies.glb` | The 3D "relic" (deformed torus knot, ~3 MB) shown in the background |
 | `wordmark.png` / `symbol.png` / `single-four.png` | Brand marks (white-on-transparent masks) |
+| `wordmark-outline.svg` | Stroke-only **hollow outline** of the wordmark — used as the intro `#boot-logo`. Traced from `wordmark.png` with `potrace`; `fill:none` + `stroke` baked into an internal `<style>` (`vector-effect:non-scaling-stroke`). Regen: `sips -s format bmp wordmark.png --out /tmp/wm.bmp && potrace -i -s -O 1 -t 12 /tmp/wm.bmp -o out.svg`, then re-add the `<style>`. |
 | `audio/444-*-demo.m4a` | The three transmissions (ENIGMA / FADEAWAY / NRG) |
 | `fonts/`, `icons/` | Audiowide / Inter / JetBrains Mono; SVG icons are inline in the HTML |
 | `vendor/three.module.js`, `vendor/jsm/**` | Pinned Three.js + addon passes/loaders (importmap maps `"three"`) |
@@ -67,13 +68,18 @@ calls, ~8.4s of build + a ~1.4s white fade. Phases:
 2. **"Installs"** — installer **dialogs** (`MOUNT`/`AUDIO`/`RELAY`/`NODES`), a
    **flooding console** (`PROC`), and **telemetry histograms** (`SYS`/`MEM`) scan
    in. Steady **flicker-blocks** step down the sides on a cadence.
-3. **The menu UI is "created"** — `#skel-module` (a skeleton whose sections mirror
+3. **Logo builds out** (~1.4s) — `#boot-logo` (the `wordmark-outline.svg` **hollow
+   outline**, see below) opens from the centre via a `clip-path` reveal with a
+   brief leading-edge glow, settling dim (`opacity ~0.56`). It is **not** the
+   persistent mark — the live *filled* hub wordmark takes over at the white flash.
+4. **The menu UI is "created"** — `#skel-module` (a skeleton whose sections mirror
    the real panel: header → label → player → tracks → 2×3 links) fades in and
    **draws downward** behind a scanline.
-4. **Relic constructs** — last, subtle: the real `wispies.glb` builds **from the
+5. **Relic constructs** — last, subtle: the real `wispies.glb` builds **from the
    centre outward** as a grey wireframe (see below).
-5. **`RENDER COMPLETE`** → white flash → relic resolves to chrome, `#stage` goes
-   `.live`, overlays clear, white fades over ~1.4s.
+6. **`RENDER COMPLETE`** → white flash → relic resolves to chrome, `#stage` goes
+   `.live`, overlays clear, white fades over ~1.4s. (There is intentionally **no**
+   pre-flash `flick()` before this — the final white flash is the only one.)
 
 **FX helpers** (boot script): `spawnDialog`, `spawnRect` (scrolling histogram),
 `spawnConsole` (flooding log), `flashBlock`/`blkBeat` (flicker-blocks), `bigText`
@@ -111,7 +117,8 @@ Vertical "voltra"-style HUD:
   so the build skeleton matches.
 - **Border** = two layers: `.module` background is the edge colour, `::before`
   (inset 1.5px, same clip-path) is the fill → a crisp rim that follows the chamfers.
-- `::after` = top-edge glint. `.hud-deco` = corner hatch + `BC·444` id + `+` ticks.
+- `::after` = top-edge glint. (The old `.hud-deco` overlay — corner hatch + `BC·444`
+  id + `+` ticks — was **removed** as fluff; don't reintroduce it.)
 - Content stacks vertically: wordmark → `// Transmissions` → player → track pills →
   **2×3** social links. Narrow/portrait; mobile-first media queries keep it tidy.
 
@@ -122,6 +129,8 @@ Vertical "voltra"-style HUD:
 | Want to change | Where |
 |----------------|-------|
 | Intro pacing / what appears when | the `at(...)` schedule in `runBoot()` |
+| Intro logo opacity / glow | the two `bootLogo.style.opacity` values on the `at(1400,…)` / `at(1900,…)` beats (currently `0.62` build → `0.56` settled), and the matching `reduce` path |
+| Intro logo outline weight | `stroke-width` in the `<style>` inside `wordmark-outline.svg` (currently `1.3`) |
 | When the white flash fires | `at(8400, startWhiteFlash)` + the 1.4s fade in `startWhiteFlash` |
 | Flicker-block cadence / count | `setInterval(blkBeat, 370)` and `at(5000, clearInterval)` |
 | Relic subtlety | `WIRE_BASE` (0.46) and `fadeVeil(0.34)` at the build beat |
