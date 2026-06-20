@@ -351,6 +351,39 @@
   .p-time { font-family: var(--mono); font-size: 9px; color: var(--glacier-dim); letter-spacing: 0.06em; flex: none; }
   .p-viz { width: 100%; height: 22px; display: block; }
 
+  /* volume control */
+  .p-vol { display: flex; align-items: center; gap: 8px; }
+  .p-vol-btn {
+    flex: none; width: 18px; height: 18px; padding: 0; border: 0; background: none;
+    color: var(--glacier-dim); cursor: pointer; display: grid; place-items: center;
+    transition: color .18s;
+  }
+  .p-vol-btn:hover { color: var(--ice-mist); }
+  .p-vol-btn.muted { color: var(--arctic); }
+  .p-vol-btn svg { width: 15px; height: 15px; fill: currentColor; display: block; }
+  .p-vol-range {
+    -webkit-appearance: none; appearance: none; flex: 1; height: 12px;
+    background: transparent; cursor: pointer; margin: 0;
+  }
+  .p-vol-range::-webkit-slider-runnable-track {
+    height: 2px;
+    background: linear-gradient(90deg, var(--ice-mist) var(--fill,50%), var(--hair-bright) var(--fill,50%));
+  }
+  .p-vol-range::-moz-range-track { height: 2px; background: var(--hair-bright); }
+  .p-vol-range::-moz-range-progress { height: 2px; background: var(--ice-mist); }
+  .p-vol-range::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 9px; height: 9px; margin-top: -3.5px;
+    background: var(--glacier); border: 1px solid var(--arctic);
+    box-shadow: 0 0 6px rgba(184,200,212,0.5); transition: background .15s;
+  }
+  .p-vol-range::-moz-range-thumb {
+    width: 9px; height: 9px; border-radius: 0;
+    background: var(--glacier); border: 1px solid var(--arctic);
+    box-shadow: 0 0 6px rgba(184,200,212,0.5);
+  }
+  .p-vol-range:hover::-webkit-slider-thumb { background: var(--ice-mist); }
+  .p-vol-range:focus-visible { outline: 1px solid var(--arctic); outline-offset: 3px; }
+
   /* track pills */
   .tracks { display: flex; gap: 6px; padding: 0 14px 14px; }
   .pill {
@@ -465,6 +498,10 @@
               <span class="p-time"><span id="tx-cur">0:00</span> / <span id="tx-dur">0:00</span></span>
             </div>
             <canvas class="p-viz" id="tx-viz"></canvas>
+            <div class="p-vol">
+              <button class="p-vol-btn" id="tx-mute" role="button" aria-label="Mute / unmute"><svg viewBox="0 0 24 24"><path id="tx-vol-icon" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+              <input class="p-vol-range" id="tx-vol" type="range" min="0" max="100" value="50" aria-label="Volume">
+            </div>
           </div>
           <div class="p-btn p-next" id="tx-next" role="button" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5l11 7L4 19z"/></svg></div>
         </div>
@@ -881,7 +918,7 @@
     }
     function fxClearAll() { fxIvals.forEach(clearInterval); fxAll.forEach(e => { e.classList.add('out'); setTimeout(() => e.remove(), 420); }); }
 
-    /* "render complete" — quick flash to white; resolve the wireframe to the solid chrome relic, then a slow ~2s fade onto the live UI */
+    /* "render complete" — quick flash to white; resolve the wireframe to the solid chrome relic, then a ~1.4s fade onto the live UI */
     function startWhiteFlash() {
       placeAll();                                   // re-pin right before the handoff
       flash.style.transition = 'opacity 0.15s ease-out';
@@ -891,9 +928,9 @@
         stageEl.classList.add('live'); startHub();  // reveal the real content beneath the white
         boot.classList.add('gone');
         setTimeout(() => boot.remove(), 400);
-        flash.style.transition = 'opacity 2s ease-in';
+        flash.style.transition = 'opacity 1.4s ease-in';
         flash.style.opacity = '0';
-        setTimeout(() => flash.remove(), 2100);
+        setTimeout(() => flash.remove(), 1500);
       }, 160);
     }
 
@@ -1040,7 +1077,10 @@
       { title: 'NRG DEMO',      tag: 'NRG',      src: 'audio/444-nrg-demo.m4a' },
     ];
     const audio = new Audio(); audio.preload = 'metadata';
-    let idx = 0, ctx, analyser, freq;
+    let idx = 0, ctx, analyser, freq, gain;
+    let muted = false;
+    let volume = 0.5;                          // gentle default — never start at full blast
+    try { const v = parseFloat(localStorage.getItem('444-vol')); if (v >= 0 && v <= 1) volume = v; } catch (e) {}
 
     const elList = document.getElementById('tx-list');
     const elTitle = document.getElementById('tx-title');
@@ -1067,9 +1107,21 @@
       ctx = new (window.AudioContext||window.webkitAudioContext)();
       const sn = ctx.createMediaElementSource(audio);
       analyser = ctx.createAnalyser(); analyser.fftSize = 128; freq = new Uint8Array(analyser.frequencyBinCount);
-      sn.connect(analyser); analyser.connect(ctx.destination);
+      gain = ctx.createGain(); gain.gain.value = effVol();
+      // analyser reads the source at full scale (so the viz isn't tied to volume); gain trims the output
+      sn.connect(analyser); analyser.connect(gain); gain.connect(ctx.destination);
     }
-    function play(){ ensureGraph(); if (ctx.state==='suspended') ctx.resume(); audio.play(); }
+    function effVol(){ return muted ? 0 : volume; }
+    function applyGain(tc){ if (!gain) return; const now=ctx.currentTime; gain.gain.cancelScheduledValues(now); gain.gain.setTargetAtTime(effVol(), now, tc); }
+    function play(){
+      ensureGraph();
+      if (ctx.state==='suspended') ctx.resume();
+      const now = ctx.currentTime;             // soft ~0.5s fade-in so playback never starts at full blast
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.setTargetAtTime(effVol(), now, 0.16);
+      audio.play();
+    }
     function toggle(){ audio.paused ? play() : audio.pause(); }
 
     audio.addEventListener('play', () => { elIcon.setAttribute('d','M6 5h4v14H6zM14 5h4v14h-4z'); elState.textContent='Broadcasting'; player.classList.add('playing'); });
@@ -1082,11 +1134,33 @@
     document.getElementById('tx-next').addEventListener('click', () => { load(idx+1); play(); });
     load(0);
 
+    /* ── volume control (slider + mute) ── */
+    const elVol = document.getElementById('tx-vol');
+    const elMute = document.getElementById('tx-mute');
+    const elVolIcon = document.getElementById('tx-vol-icon');
+    const VOL_ON  = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z';
+    const VOL_OFF = 'M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z';
+    function syncVol(){
+      const on = !muted && volume > 0;
+      elVol.value = Math.round(volume*100);
+      elVol.style.setProperty('--fill', (muted ? 0 : volume*100) + '%');
+      elVolIcon.setAttribute('d', on ? VOL_ON : VOL_OFF);
+      elMute.classList.toggle('muted', !on);
+    }
+    elVol.addEventListener('input', () => {
+      volume = elVol.value/100; if (volume>0) muted=false;
+      try { localStorage.setItem('444-vol', String(volume)); } catch (e) {}
+      applyGain(0.02); syncVol();
+    });
+    elMute.addEventListener('click', () => { muted=!muted; applyGain(0.05); syncVol(); });
+    syncVol();
+
     /* ── waveform viz + drive the 3D relic ── */
     function sizeViz(){ const dpr=Math.min(window.devicePixelRatio,2); vctx.setTransform(1,0,0,1,0,0); viz.width=viz.clientWidth*dpr; viz.height=viz.clientHeight*dpr; vctx.scale(dpr,dpr); }
     window.addEventListener('resize', sizeViz); setTimeout(sizeViz, 50);
     const BARS = 42;
     const levels = new Float32Array(BARS);   // persisted across frames so we can lerp
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     (function draw(){
       requestAnimationFrame(draw);
       const w=viz.clientWidth, h=viz.clientHeight; if (!w) return;
@@ -1094,12 +1168,21 @@
       const gap=2, bw=(w-(BARS-1)*gap)/BARS;
       const live = analyser && !audio.paused;
       if (live) analyser.getByteFrequencyData(freq);
+      const t = Date.now()/1000;
       let sum=0;
       for (let i=0;i<BARS;i++){
-        const target = live ? (freq[Math.floor(i/BARS*freq.length)]/255)
-                            : (0.05 + 0.03*Math.sin(i*0.6 + Date.now()/600));
-        // asymmetric lerp — quick attack, gentle release so bars move musically, not jittery
-        const k = target > levels[i] ? 0.5 : 0.12;
+        let target, k;
+        if (live) {
+          target = freq[Math.floor(i/BARS*freq.length)]/255;
+          // asymmetric lerp — quick attack, gentle release so bars move musically, not jittery
+          k = target > levels[i] ? 0.5 : 0.12;
+        } else {
+          // idle standby wave: two slow sines travelling opposite ways + a gentle breathing envelope
+          const u = i/(BARS-1);
+          const wv = Math.sin(u*6.2 - t*1.4)*0.5 + Math.sin(u*2.7 + t*0.9)*0.5;   // -1..1
+          target = reduceMotion ? 0.12 : (0.14 + 0.42*(wv*0.5+0.5)) * (0.80 + 0.20*Math.sin(t*0.7));
+          k = 0.18;   // symmetric smoothing keeps the travelling wave shape clean
+        }
         levels[i] += (target - levels[i]) * k;
         sum += levels[i];
         const bh=Math.max(1.5, levels[i]*h);

@@ -61,7 +61,7 @@ intro never reveals the hub early.
 ## The intro / boot sequence
 
 Driven by `runBoot()` in the boot script — a timeline of `at(ms, fn)` (setTimeout)
-calls, ~8.4s of build + a ~2s white fade. Phases:
+calls, ~8.4s of build + a ~1.4s white fade. Phases:
 
 1. **Black** → console wakes; `INITIALIZING` flashes vertically on the left edge.
 2. **"Installs"** — installer **dialogs** (`MOUNT`/`AUDIO`/`RELAY`/`NODES`), a
@@ -73,7 +73,7 @@ calls, ~8.4s of build + a ~2s white fade. Phases:
 4. **Relic constructs** — last, subtle: the real `wispies.glb` builds **from the
    centre outward** as a grey wireframe (see below).
 5. **`RENDER COMPLETE`** → white flash → relic resolves to chrome, `#stage` goes
-   `.live`, overlays clear, white fades over ~2s.
+   `.live`, overlays clear, white fades over ~1.4s.
 
 **FX helpers** (boot script): `spawnDialog`, `spawnRect` (scrolling histogram),
 `spawnConsole` (flooding log), `flashBlock`/`blkBeat` (flicker-blocks), `bigText`
@@ -122,7 +122,7 @@ Vertical "voltra"-style HUD:
 | Want to change | Where |
 |----------------|-------|
 | Intro pacing / what appears when | the `at(...)` schedule in `runBoot()` |
-| When the white flash fires | `at(8400, startWhiteFlash)` + the 2s fade in `startWhiteFlash` |
+| When the white flash fires | `at(8400, startWhiteFlash)` + the 1.4s fade in `startWhiteFlash` |
 | Flicker-block cadence / count | `setInterval(blkBeat, 370)` and `at(5000, clearInterval)` |
 | Relic subtlety | `WIRE_BASE` (0.46) and `fadeVeil(0.34)` at the build beat |
 | Relic build speed | the lerp `dt * 0.95` in `updateRelic` |
@@ -130,6 +130,9 @@ Vertical "voltra"-style HUD:
 | Panel shape | `--hud-shape` in `:root` |
 | Brand colours / fonts | `:root` palette + `fonts/fonts.css` |
 | Tracks / links | `TX` array (audio) + the `.links` `<a>` list in the HTML |
+| Default volume / fade-in | `volume = 0.5` (persisted to `localStorage['444-vol']`) + the gain `setTargetAtTime` fade in `play()` — output runs through a `GainNode` (`sn → analyser → gain → destination`) so playback never starts at full blast |
+| Volume slider / mute look | `.p-vol*` CSS rules + `syncVol()` (the `--fill` track gradient + `VOL_ON`/`VOL_OFF` speaker glyphs) |
+| Idle waveform look | the `else` (standby) branch in the `draw()` loop — travelling sines + breathing envelope; honours `prefers-reduced-motion` |
 
 ---
 
