@@ -23,6 +23,10 @@ git push origin main
 (Pushing requires write access to `decoy-dev/444-linksite`; the design work was
 done under a different account, so make sure `gh`/git is authed as `decoy-dev`.)
 
+**Client handoff:** for shipping this to the client's own host/domain (it's a fully
+static site — host anywhere, no build), see **[`DEPLOY.md`](DEPLOY.md)**, written for
+the client and their AI assistant.
+
 ---
 
 ## Files
